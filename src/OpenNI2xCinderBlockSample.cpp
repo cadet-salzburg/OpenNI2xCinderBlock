@@ -85,10 +85,9 @@ void OpenNI2xCinderBlockSample::draw()
 		m_OpenNI2xBlock.updateDevice(i);
 		m_OpenNI2xBlock.debugDraw(i);
 	}
-	
+
 	// Draw the interface
 	m_Params->draw();
-	
 }
 
 void OpenNI2xCinderBlockSample::setMirrored()

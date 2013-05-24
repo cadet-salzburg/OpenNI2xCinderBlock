@@ -329,17 +329,16 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 		m_Devices[iDeviceNumber]->m_Depth16BitSurface = Surface16u(Channel16u( m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_DepthFrame.getStrideInBytes(), 1, depthImgData));
 		
 		// normalizing values for 8bit depth display, this is done every frame, so not very performant
-		int size=m_Devices[iDeviceNumber]->m_iDepthImgWidth * m_Devices[iDeviceNumber]->m_iDepthImgHeight;
-		unsigned char*  img =new unsigned char[size];
+		uint32_t size=m_Devices[iDeviceNumber]->m_iDepthImgWidth * m_Devices[iDeviceNumber]->m_iDepthImgHeight;
+		unsigned char*  img = new unsigned char[size];
 		int normalizing = 10000; // 10meters max 
 		for( unsigned int i=0; i<size; ++i )
 		{
 			img[i] = (unsigned char) ( depthImgData[i] * ( (float)( 255 ) / normalizing ) ); 	
 		}
-		delete img;
-
 		m_Devices[iDeviceNumber]->m_Depth8BitSurface = Surface(Channel(m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_iDepthImgWidth
 			, sizeof(char), img)).clone();
+		delete img;
 	}
 	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid() && irImgData!=nullptr)
 	{
