@@ -1,5 +1,6 @@
 #include "cinder/app/AppBasic.h"
 #include "cinder/params/Params.h"
+#include "cinder/Utilities.h"
 
 #include "OpenNI2xWrapper.h"
 
@@ -85,6 +86,8 @@ void OpenNI2xCinderBlockSample::draw()
 		m_OpenNI2xBlock.updateDevice(i);
 		m_OpenNI2xBlock.debugDraw(i);
 	}
+
+	gl::drawString( "fps: " + toString(getAverageFps()), Vec2f( getWindowWidth()-130, 10.0f ), Color(1,0,0), Font("Arial", 20));
 
 	// Draw the interface
 	m_Params->draw();

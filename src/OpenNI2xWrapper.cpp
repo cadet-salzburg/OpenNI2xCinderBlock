@@ -627,8 +627,7 @@ void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 {
 	int windowPos=0;
 
-	glPushMatrix();
-	gl::color(ColorA(1.0f,1.0f,1.0f,0.6f));
+	gl::pushMatrices();
 	gl::setViewport( getWindowBounds() );
 	gl::setMatricesWindow( getWindowSize() );
 
@@ -683,5 +682,5 @@ void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 
 	drawSkeletons(iDeviceNumber, Rectf(x1,(float)(getWindowHeight()/4.0f)*3,x2,(float)(getWindowHeight())));
 
-	glPopMatrix();
+	gl::popMatrices();
 }

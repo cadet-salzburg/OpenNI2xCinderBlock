@@ -39,10 +39,10 @@ TODO
 ----
 
 * Skeleton
+* Alternative event based implementation (should be way faster as it's threaded)
 * Realtime change of resolutions and active streams
 * Device Connect/Disconnect Events
 * Seperation Wrapper / Cinder Helper Code
 * Test if recording of multiple devices is possible simultaniously
 * Quiet mode --> switch of error and debug msgs in console
-* Alternative event based implementation (not sure if this brings any benefits)
 * TinderBox automatically copying OPENNI and NITE REDIST not sure if tinderbox supports that
