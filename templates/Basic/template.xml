@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<cinder>
+<template name="OpenNI2x: Basic" parent="org.libcinder.apptemplates.basicopengl">
+	<requires>openni2x.cadet.at</requires>
+	<source replaceContents="true" replaceName="true">src/_TBOX_PREFIX_App.cpp</source>
+</template>
+</cinder>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<cinder>
+<block
+	name="OpenNI2x"
+	id="openni2x.cadet.at"
+	author="Robert Praxmarer"
+	license="Apache 2.0"
+	summary="OpenNI2x block for easy use of image and depth sensing devices in cinder"
+	version="1.0alpha"
+	>
+	<platform os="msw">
+		<header>src/OpenNI2xWrapper.h</header>
+		<source>src/OpenNI2xWrapper.cpp</source>
+		<includePath>src/</includePath>		
+		<includePath absolute="true">$(OPENNI2_INCLUDE)</includePath>
+		<includePath absolute="true">$(NITE2_INCLUDE)</includePath>
+		<libraryPath absolute="true">$(OPENNI2_LIB)</libraryPath>
+		<libraryPath absolute="true">$(NITE2_LIB)</libraryPath>
+		<staticLibrary absolute="true">OpenNI2.lib</staticLibrary>
+		<staticLibrary absolute="true">Nite2.lib</staticLibrary>		
+	<!-- 	<buildCopy absolute="true">$(OPENNI2_REDIST)/*.dll</buildCopy>
+		<buildCopy absolute="true">$(NITE2_REDIST)/*.dll</buildCopy> -->
+	</platform>
+</block>
+<template>templates/Basic/template.xml</template>
+</cinder>
