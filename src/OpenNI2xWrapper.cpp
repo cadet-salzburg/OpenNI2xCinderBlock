@@ -669,7 +669,7 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 			gl::drawSolidCircle( Vec2f( joints[j].x * rect.getWidth() + rect.getX1(), joints[j].y * rect.getHeight() + rect.getY1()), fRadius);
 		}
 	}	
-	
+	glColor3f( 1.0, 1.0, 1.0 );	
 	glLineWidth(1.0);
 	gl::popMatrices();
 }
