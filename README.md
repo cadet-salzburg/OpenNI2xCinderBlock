@@ -46,7 +46,7 @@ Known Issues
 
 TODO
 ----
-
+* Auto Restart not implemented for multiple devices yet, coming soon
 * Skeleton (getters for orientations, ...)
 * Alternative event based implementation (should be way faster as it's threaded)
 * device number vs. uri, rewrite functions to work with unique ids
