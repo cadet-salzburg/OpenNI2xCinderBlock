@@ -87,7 +87,7 @@ void OpenNI2xCinderBlockSample::draw()
 		m_OpenNI2xBlock.debugDraw(i);
 	}
 
-	gl::drawString( "fps: " + toString(getAverageFps()), Vec2f( getWindowWidth()-130, 10.0f ), Color(1,0,0), Font("Arial", 20));
+	gl::drawString( "fps: " + toString(getAverageFps()), Vec2f( getWindowWidth()-130.0f, 10.0f ), Color(1.0f,0.0f,0.0f), Font("Arial", 20));
 
 	// Draw the interface
 	m_Params->draw();

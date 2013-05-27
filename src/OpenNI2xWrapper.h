@@ -14,6 +14,7 @@ class OpenNIDevice
 {
 	public:	
 		openni::Device								m_Device;
+		openni::VideoStream**						m_pStreams;
 		openni::VideoStream							m_RGBStream;
 		openni::VideoStream							m_IRStream;
 		openni::VideoStream							m_DepthStream;
@@ -65,7 +66,9 @@ class OpenNIDevice
 };
 
 
-class OpenNI2xWrapper 
+class OpenNI2xWrapper : public openni::OpenNI::DeviceConnectedListener,
+									public openni::OpenNI::DeviceDisconnectedListener,
+									public openni::OpenNI::DeviceStateChangedListener
 {
 public:
 	OpenNI2xWrapper(void);
@@ -78,6 +81,7 @@ public:
 	void			updateDevice(uint16_t iDeviceNumber);
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getNumberOfConnectedDevices();
+	uint16_t		getDeviceNumberForURI(std::string uri);
 	uint16_t		getNumberOfRunningDevices();
 	uint16_t		getNumberOfUsers(uint16_t iDeviceNumber);
 	
@@ -110,6 +114,11 @@ public:
 private:
 	bool startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream);
 	void printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts);
+
+	// overwrite for baseclass of openni for device connection callbacks
+	void onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state);
+	void onDeviceConnected(const openni::DeviceInfo* pInfo);
+	void onDeviceDisconnected(const openni::DeviceInfo* pInfo);
 
 	std::vector<std::shared_ptr<OpenNIDevice>>			m_Devices;
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	

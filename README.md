@@ -12,6 +12,15 @@ Getting Ready
 	if you don't do this the app crashes cause it can't find the NITE2.dll
 * If you start the app from within Visual Studio be sure to put the working dir ..\..\bin in the settings, otherwise dlls won't be found
 
+Features
+--------
+* RGB, Depth, IR Streams supported (just two streams work simultaniously)
+* User Tracking / Skeleton Tracking
+* Nonblocking
+* Recording / Playback
+* Multiple Devices (this wrapper manages multiple devices easy for you to startup, get data, ...) 
+* Hotplugging of devices, auto restart when connected device gets unconnected and then reconnected (still experimental, needs testing on multiple devices)
+
 Known Issues 
 ------------
 
@@ -38,8 +47,9 @@ Known Issues
 TODO
 ----
 
-* Skeleton
+* Skeleton (getters for orientations, ...)
 * Alternative event based implementation (should be way faster as it's threaded)
+* device number vs. uri, rewrite functions to work with unique ids
 * Realtime change of resolutions and active streams
 * Device Connect/Disconnect Events
 * Seperation Wrapper / Cinder Helper Code
