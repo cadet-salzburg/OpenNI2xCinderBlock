@@ -78,7 +78,7 @@ bool OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream, bo
 
 	if(iDeviceNumber>=m_DeviceInfoList.getSize())
 	{
-		std::cout << "OpenNI: Failure device number: " << m_DeviceInfoList.getSize() << " not detected --> check drivers abd device manager" << std::endl;
+		std::cout << "OpenNI: Failure device number: " << m_DeviceInfoList.getSize() << " not detected --> check drivers and device manager" << std::endl;
 		return false;
 	}
 
@@ -537,12 +537,13 @@ void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnable
 
 void OpenNI2xWrapper::setBackgroundSubtraction(uint16_t iDeviceNumber, bool bEnabled)
 {
-	m_Devices[iDeviceNumber]->m_bSubtractBackground = bEnabled;
+	if(m_Devices.size()>0)
+		m_Devices[iDeviceNumber]->m_bSubtractBackground = bEnabled;
 }
 
 Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth16BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth16BitSurface)
 		return m_Devices[iDeviceNumber]->m_Depth16BitSurface;
 	else
 		return Surface16u();
@@ -550,7 +551,7 @@ Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth16BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth16BitSurface)
 		m_Devices[iDeviceNumber]->m_Depth16BitTexture = gl::Texture(m_Devices[iDeviceNumber]->m_Depth16BitSurface);
 	
 	return m_Devices[iDeviceNumber]->m_Depth16BitTexture;
@@ -558,7 +559,7 @@ gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth8BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth8BitSurface)
 		return Surface(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
 	else
 		return Surface();
@@ -566,7 +567,7 @@ Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 {	
-	if(m_Devices[iDeviceNumber]->m_Depth8BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth8BitSurface)
 		m_Devices[iDeviceNumber]->m_Depth8BitTexture = gl::Texture(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
 	
 	return m_Devices[iDeviceNumber]->m_Depth8BitTexture;
@@ -574,7 +575,7 @@ gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_RGBSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_RGBSurface)
 		return m_Devices[iDeviceNumber]->m_RGBSurface;
 	else
 		return Surface();
@@ -582,7 +583,7 @@ Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_RGBSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_RGBSurface)
 		m_Devices[iDeviceNumber]->m_RGBTexture = gl::Texture(m_Devices[iDeviceNumber]->m_RGBSurface);
 
 	return m_Devices[iDeviceNumber]->m_RGBTexture;
@@ -590,7 +591,7 @@ gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_IRSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_IRSurface)
 		return m_Devices[iDeviceNumber]->m_IRSurface;
 	else
 		return Surface();
@@ -598,7 +599,7 @@ Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_IRSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_IRSurface)
 		m_Devices[iDeviceNumber]->m_IRTexture = gl::Texture(m_Devices[iDeviceNumber]->m_IRSurface);
 
 	return m_Devices[iDeviceNumber]->m_IRTexture;
@@ -606,7 +607,7 @@ gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_UserSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_UserSurface)
 		return m_Devices[iDeviceNumber]->m_UserSurface;
 	else
 		return Surface();
@@ -614,7 +615,7 @@ Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_UserSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_UserSurface)
 		m_Devices[iDeviceNumber]->m_UserTexture = gl::Texture(m_Devices[iDeviceNumber]->m_UserSurface);
 	
 	return m_Devices[iDeviceNumber]->m_UserTexture;
