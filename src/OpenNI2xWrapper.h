@@ -54,6 +54,8 @@ class OpenNIDevice
 		uint16_t									m_UserCount;
 		openni::PlaybackControl*					m_Player;
 		
+		std::mutex									m_MutexDevice;	
+
 		bool					m_bVisibleUsers[MAX_USERS];
 		nite::SkeletonState		m_SkeletonStates[MAX_USERS];
 		char					m_cUserStatusLabels[MAX_USERS][100];
@@ -150,6 +152,7 @@ private:
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
 	std::mutex											m_Mutex;	
+	
 	bool												m_bUserTrackingInitizialized;
 };
 

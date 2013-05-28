@@ -42,6 +42,7 @@ Features
 --------
 * RGB, Depth, IR Streams supported (just two streams work simultaniously)
 * User Tracking / Skeleton Tracking
+* Masking RGB, IR and Depth Stream with User Stream (Background Substraction)
 * Nonblocking
 * Recording / Playback
 * Multiple Devices (this wrapper manages multiple devices easy for you to startup, get data, ...) 
@@ -56,6 +57,8 @@ Known Issues
 	  You can't install patched avin2 drivers anymore with OpenNI 2.0 
 
 	* When using with Kinect and Windows Kinect drivers just 8bit image information can be retrieved and is shown
+
+	* Timeout for Wait forAnyStream not working for Kinect SDK (so for now no framerate boost in polling mode)
 
 * Other issues
 	
@@ -72,10 +75,9 @@ TODO
 ----
 * Auto Restart still problems to fix
 * Skeleton (getters for orientations, ...)
-* Alternative event based implementation (should be way faster as it's threaded)
+* Alternative event based implementation (should be way faster as it's threaded,specially for multiple devices)
 * device number vs. uri, rewrite functions to work with unique ids
 * Realtime change of resolutions and active streams
-* Device Connect/Disconnect Events
 * Seperation Wrapper / Cinder Helper Code
 * Test if recording of multiple devices is possible simultaniously
 * Quiet mode --> switch of error and debug msgs in console

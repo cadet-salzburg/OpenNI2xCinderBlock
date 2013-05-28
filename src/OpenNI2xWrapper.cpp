@@ -103,30 +103,30 @@ bool OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream, bo
 
 void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
-	std::lock_guard<std::mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(iDeviceNumber>m_Devices.size()-1)
+		return;
 
-	if(iDeviceNumber<m_Devices.size())
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
+	
+	// not sure if I have to care for cleanup of the streams running, as they are part of the device
+	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
 	{
-		// not sure if I have to care for cleanup of the streams running, as they are part of the device
-		if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
-		{
-			m_Devices[iDeviceNumber]->m_DepthStream.stop();
-			m_Devices[iDeviceNumber]->m_DepthStream.destroy();
-		}
-		if (m_Devices[iDeviceNumber]->m_bRGBStreamActive)
-		{
-			m_Devices[iDeviceNumber]->m_RGBStream.stop();
-			m_Devices[iDeviceNumber]->m_RGBStream.destroy();
-		}
-		if (m_Devices[iDeviceNumber]->m_bIRStreamActive)
-		{
-			m_Devices[iDeviceNumber]->m_IRStream.stop();
-			m_Devices[iDeviceNumber]->m_IRStream.destroy();
-		}
-		
-		m_Devices[iDeviceNumber]->m_Device.close();
-		m_Devices.erase(m_Devices.begin()+iDeviceNumber);
+		m_Devices[iDeviceNumber]->m_DepthStream.stop();
+		m_Devices[iDeviceNumber]->m_DepthStream.destroy();
 	}
+	if (m_Devices[iDeviceNumber]->m_bRGBStreamActive)
+	{
+		m_Devices[iDeviceNumber]->m_RGBStream.stop();
+		m_Devices[iDeviceNumber]->m_RGBStream.destroy();
+	}
+	if (m_Devices[iDeviceNumber]->m_bIRStreamActive)
+	{
+		m_Devices[iDeviceNumber]->m_IRStream.stop();
+		m_Devices[iDeviceNumber]->m_IRStream.destroy();
+	}
+		
+	m_Devices[iDeviceNumber]->m_Device.close();
+	m_Devices.erase(m_Devices.begin()+iDeviceNumber);
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -279,14 +279,17 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 {
 	int streamReady=-1;
 
+	if(iDeviceNumber>m_Devices.size()-1)
+		return;
+
 	// non-blocking wait --> return if not both streams are ready to process
-	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 1) == openni::STATUS_TIME_OUT || 
-		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 1) == openni::STATUS_TIME_OUT)
+	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT || 
+		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
 	{
 		return; 
 	}
 
-	std::lock_guard<std::mutex> lock(m_Mutex);	// lock for correct shutdown, so no one tries to grab still frames
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct shutdown, so no one tries to grab still frames
 	
 	// user tracking / skeleton tracking
 	uint16_t* pUserImgData;
