@@ -1,8 +1,34 @@
+/*
+	CADET - Center for Advances in Digital Entertainment Technologies
+	Copyright 2013 University of Applied Science Salzburg / MultiMediaTechnology
+
+	http://www.cadet.at
+	http://multimediatechnology.at/
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+
+	CADET - Center for Advances in Digital Entertainment Technologies
+
+	Authors: Robert Praxmarer
+	Email: support@cadet.at
+	Created: 17-05-2013
+*/
+
 OpenNI2xCinderBlock
 ===================
 
 Cinder Block for new OpenNI 2.x API (Kinect, PrimeSense and other TOF devices) 
-	written by Robert Praxmarer, this piece of software is free of use do with it what u want but don't blame me 
+	written by Robert Praxmarer, this piece of software is free (Apache 2.0), do with it what u want but don't blame me 
 
 Getting Ready
 -------------
@@ -37,8 +63,6 @@ Known Issues
 		(tested with KINECT SDK and NITE2 for live and playback devices, should behave the same when using two real devices)
 	
 	* When the UserTracker is enabled you can't mirror the DepthStream
-
-	* You can't mix devices with different drivers (not possible to run an asus with prime sense driver and a kinect with windows driver)
 
 	* OpenNI function setDepthColorSyncEnable(); freezes app with AsusSensor, it seems to be ignored on windows kinect 
 
