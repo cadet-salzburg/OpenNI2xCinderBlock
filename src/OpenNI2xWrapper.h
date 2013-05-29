@@ -135,8 +135,8 @@ public:
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
 	uint16_t					getUserCount(uint16_t iDeviceNumber);
-	ci::Vec3f					getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);
-	ci::Rectf					getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);
+	ci::Vec3f					getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
+	ci::Rectf					getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
 	std::vector<cinder::Vec3f>	getUserSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
 
 	void						drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect);

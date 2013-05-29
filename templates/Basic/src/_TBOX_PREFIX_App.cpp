@@ -30,7 +30,7 @@ void _TBOX_PREFIX_App::setup()
 {
 	// init openni and nite and start up all connected and found devices
 	m_OpenNI2xBlock.init();
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfConnectedDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)
 		m_OpenNI2xBlock.startDevice(i);
 }
 
@@ -49,7 +49,7 @@ void _TBOX_PREFIX_App::draw()
 {
 	gl::clear();
 
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 	{
 		m_OpenNI2xBlock.updateDevice(i);
 		m_OpenNI2xBlock.debugDraw(i);
