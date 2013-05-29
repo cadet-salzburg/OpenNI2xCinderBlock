@@ -108,10 +108,10 @@ public:
 	void			stopDevice(uint16_t iDeviceNumber);
 	void			updateDevice(uint16_t iDeviceNumber);
 	bool			resetDevice(uint16_t iDeviceNumber);
-	uint16_t		getNumberOfConnectedDevices();
+	uint16_t		getDevicesConnected();
 	uint16_t		getDeviceNumberForURI(std::string uri);
-	uint16_t		getNumberOfRunningDevices();
-	uint16_t		getNumberOfUsers(uint16_t iDeviceNumber);
+	uint16_t		getDevicesRunning();
+	
 	
 	bool			startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed=false);
 	void			stopRecording();
@@ -134,9 +134,12 @@ public:
 	ci::Surface		getUserSurface(uint16_t iDeviceNumber);
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
-	ci::Vec3f					getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iUserID);
+	uint16_t					getUserCount(uint16_t iDeviceNumber);
+	ci::Vec3f					getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);
+	ci::Rectf					getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);
+	std::vector<cinder::Vec3f>	getUserSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
+
 	void						drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect);
-	std::vector<cinder::Vec3f>	getSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
 	void						debugDraw(uint16_t iDeviceNumber);
 	
 private:

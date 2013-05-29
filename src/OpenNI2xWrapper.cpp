@@ -231,12 +231,12 @@ uint16_t OpenNI2xWrapper::getDeviceNumberForURI(std::string uri)
 	return -1;	// no device with this uri found connected
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfConnectedDevices()
+uint16_t OpenNI2xWrapper::getDevicesConnected()
 {
 	return m_DeviceInfoList.getSize();
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfRunningDevices()
+uint16_t OpenNI2xWrapper::getDevicesRunning()
 {
 	return m_Devices.size();
 }
@@ -507,7 +507,7 @@ void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
 	stopDevice(iRecordId);
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfUsers(uint16_t iDeviceNumber)
+uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
 {
 	return m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers().getSize();
 }
@@ -624,7 +624,7 @@ gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 	return m_Devices[iDeviceNumber]->m_UserTexture;
 }
 
-Vec3f OpenNI2xWrapper::getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iUserID)
+Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID)
 {
 	float coordinates[3] = {0};
 
@@ -632,14 +632,17 @@ Vec3f OpenNI2xWrapper::getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iU
 	const nite::UserData& user = users[iUserID];
 
 	m_Devices[iDeviceNumber]->m_pUserTracker->convertJointCoordinatesToDepth(user.getCenterOfMass().x, user.getCenterOfMass().y, user.getCenterOfMass().z, &coordinates[0], &coordinates[1]);
+	// normalize
+	coordinates[0] = coordinates[0] / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
+	coordinates[1] = coordinates[1] / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
 
 	return Vec3f(coordinates[0],coordinates[1],user.getCenterOfMass().z);
 }
 
-std::vector<cinder::Vec3f> OpenNI2xWrapper::getSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser)			
+std::vector<cinder::Vec3f> OpenNI2xWrapper::getUserSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUserID)			
 {
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
-	const nite::UserData& user = users[iUser];
+	const nite::UserData& user = users[iUserID];
 	
 	std::vector<cinder::Vec3f> joints;
 
@@ -656,6 +659,15 @@ std::vector<cinder::Vec3f> OpenNI2xWrapper::getSkeletonJointPositions(uint16_t i
 	return joints;
 }
 
+ci::Rectf OpenNI2xWrapper::getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID)
+{
+	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
+	const nite::UserData& user = users[iUserID];
+	float w=(float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
+	float h=(float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
+	return ci::Rectf(ci::Vec2f(user.getBoundingBox().min.x / w, user.getBoundingBox().min.y / h), 
+		ci::Vec2f(user.getBoundingBox().max.x / w, user.getBoundingBox().max.y / h));
+}
 
 void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 {
@@ -664,9 +676,9 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 	gl::pushMatrices();
 	glLineWidth(2.0);
 		
-	for(uint16_t i = 0; i < getNumberOfUsers(iDeviceNumber); ++i)
+	for(uint16_t i = 0; i < getUserCount(iDeviceNumber); ++i)
 	{	
-		std::vector<cinder::Vec3f> joints = getSkeletonJointPositions(iDeviceNumber, i);		
+		std::vector<cinder::Vec3f> joints = getUserSkeletonJointPositions(iDeviceNumber, i);		
 		glColor3f( 0, 1.0, 0.0 );				
 		for(uint16_t j = 0; j< joints.size(); j++)
 		{
@@ -722,14 +734,20 @@ void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 	if(m_Devices[iDeviceNumber]->m_UserTexture)
 	{
 		gl::draw(m_Devices[iDeviceNumber]->m_UserTexture,  Rectf(x1, (float)windowPos *(float)getWindowHeight()/4.0f, x2, (float)(windowPos+1) * (float)getWindowHeight()/4.0f) );
-		// draw centroids
-		for(int i=0; i<getNumberOfUsers(iDeviceNumber); i++)
+		// draw centroids & bounding boxes
+		for(int i=0; i<getUserCount(iDeviceNumber); i++)
 		{
-			Vec3f pos = getCenterOfMassOfUser(iDeviceNumber, i);
-			pos.x=(pos.x / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth()) * (float)getWindowWidth()/numberOfDevices + x1;
-			pos.y=(pos.y / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight()) * (float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			Vec3f pos = getUserCenterOfMass(iDeviceNumber, i);
+			pos.x=pos.x*(float)getWindowWidth()/numberOfDevices + x1;
+			pos.y=pos.y*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			Rectf bb = getUserBoundingBox(iDeviceNumber, i);
+			bb.x1=bb.x1*(float)getWindowWidth()/numberOfDevices + x1;
+			bb.x2=bb.x2*(float)getWindowWidth()/numberOfDevices + x1;
+			bb.y1=bb.y1*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			bb.y2=bb.y2*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
 			gl::color(1,0,0);
 			gl::drawSolidCircle(Vec2f(pos.x, pos.y),3);
+			gl::drawStrokedRect(bb);
 			gl::color(1,1,1);
 		}
 		windowPos++;
