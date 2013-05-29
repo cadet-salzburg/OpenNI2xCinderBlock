@@ -53,8 +53,9 @@ class OpenNIDevice
 		uint64_t									m_poseTime;
 		uint16_t									m_UserCount;
 		openni::PlaybackControl*					m_Player;
-		
+		bool										m_bIsRunning;
 		std::mutex									m_MutexDevice;	
+		std::string									m_Uri;
 
 		bool					m_bVisibleUsers[MAX_USERS];
 		nite::SkeletonState		m_SkeletonStates[MAX_USERS];
@@ -112,18 +113,20 @@ public:
 
 	bool			init(bool bUseUserTracking=true);
 	bool			shutdown();
-	bool			startDevice(uint16_t iDeviceNumber, bool bHasRGBStream=true, bool bHasDepthStream=true, bool bHasUserTracker=true, bool bHasIRStream=false);
+	int16_t			startDevice(std::string uri, bool bHasRGBStream=true, bool bHasDepthStream=true, bool bHasUserTracker=true, bool bHasIRStream=false);
+	int16_t			startDevice(uint16_t iDeviceNumber, bool bHasRGBStream=true, bool bHasDepthStream=true, bool bHasUserTracker=true, bool bHasIRStream=false);
+	void			stopDevice(std::string uri);
 	void			stopDevice(uint16_t iDeviceNumber);
 	void			updateDevice(uint16_t iDeviceNumber);
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getDevicesConnected();
-	uint16_t		getDeviceNumberForURI(std::string uri);
+	int16_t			getRegisteredDeviceNumberForURI(std::string uri);
 	uint16_t		getDevicesRunning();
 	
 	
 	bool			startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed=false);
 	void			stopRecording();
-	uint16_t		startPlayback(std::string fileName);
+	int16_t			startPlayback(std::string fileName);
 	void			stopPlayback(uint16_t iRecordId);
 	
 	void			setDepthColorImageAlignment(uint16_t iDeviceNumber, bool bEnabled);
@@ -145,7 +148,7 @@ public:
 	uint16_t							getUserCount(uint16_t iDeviceNumber);
 	ci::Vec3f							getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
 	ci::Rectf							getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
-	std::vector<OpenNIJoint>			getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
+	std::vector<OpenNIJoint>			getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUser);						//in normalized screen coords 0..1
 
 	void						drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect);
 	void						debugDraw(uint16_t iDeviceNumber);
@@ -153,6 +156,7 @@ public:
 private:
 	bool startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream);
 	void printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts);
+	int16_t getRegisteredDeviceID(std::string uri);
 
 	// overwrite for baseclass of openni for device connection callbacks
 	void onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state);

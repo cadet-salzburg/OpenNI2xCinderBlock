@@ -74,8 +74,8 @@ Known Issues
 TODO
 ----
 * Auto Restart still problems to fix
-* Skeleton (getters for orientations, ...)
 * Alternative event based implementation (should be way faster as it's threaded,specially for multiple devices)
+* HandTracker
 * device number vs. uri, rewrite functions to work with unique ids
 * Realtime change of resolutions and active streams
 * Seperation Wrapper / Cinder Helper Code
