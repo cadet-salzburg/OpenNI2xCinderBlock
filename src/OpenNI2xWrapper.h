@@ -93,6 +93,14 @@ class OpenNIDevice
 		ci::gl::Texture							m_DepthDiffTexture;
 };
 
+class OpenNIJoint
+{
+public:
+	cinder::Vec3f m_Position;
+	cinder::Quatf m_Orientation;
+	float m_PositionConfidence;
+	float m_OrientationConfidence;
+};
 
 class OpenNI2xWrapper : public openni::OpenNI::DeviceConnectedListener,
 									public openni::OpenNI::DeviceDisconnectedListener,
@@ -134,10 +142,10 @@ public:
 	ci::Surface		getUserSurface(uint16_t iDeviceNumber);
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
-	uint16_t					getUserCount(uint16_t iDeviceNumber);
-	ci::Vec3f					getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
-	ci::Rectf					getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
-	std::vector<cinder::Vec3f>	getUserSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
+	uint16_t							getUserCount(uint16_t iDeviceNumber);
+	ci::Vec3f							getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
+	ci::Rectf							getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
+	std::vector<OpenNIJoint>			getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
 
 	void						drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect);
 	void						debugDraw(uint16_t iDeviceNumber);

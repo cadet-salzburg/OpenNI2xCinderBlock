@@ -639,22 +639,27 @@ Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUse
 	return Vec3f(coordinates[0],coordinates[1],user.getCenterOfMass().z);
 }
 
-std::vector<cinder::Vec3f> OpenNI2xWrapper::getUserSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUserID)			
+std::vector<OpenNIJoint> OpenNI2xWrapper::getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUserID)			
 {
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
 	const nite::UserData& user = users[iUserID];
 	
-	std::vector<cinder::Vec3f> joints;
+	std::vector<OpenNIJoint> joints;
 
 	for(int i=0; i<15; i++)
 	{
 		nite::SkeletonJoint joint =  user.getSkeleton().getJoint((nite::JointType)i);
+		OpenNIJoint tmp;
 		Vec3f pos;
 		m_Devices[iDeviceNumber]->m_pUserTracker->convertJointCoordinatesToDepth(joint.getPosition().x, joint.getPosition().y, joint.getPosition().z, &pos.x, &pos.y);
 		pos.x = pos.x / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
 		pos.y = pos.y / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
 		pos.z=0;
-		joints.push_back(pos);
+		tmp.m_Position = pos;
+		tmp.m_Orientation = ci::Quatf(joint.getOrientation().x, joint.getOrientation().y, joint.getOrientation().z, joint.getOrientation().w);
+		tmp.m_PositionConfidence = joint.getPositionConfidence();
+		tmp.m_OrientationConfidence = joint.getOrientationConfidence();
+		joints.push_back(tmp);
 	}
 	return joints;
 }
@@ -678,11 +683,25 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 		
 	for(uint16_t i = 0; i < getUserCount(iDeviceNumber); ++i)
 	{	
-		std::vector<cinder::Vec3f> joints = getUserSkeletonJointPositions(iDeviceNumber, i);		
-		glColor3f( 0, 1.0, 0.0 );				
+		std::vector<OpenNIJoint> joints = getUserSkeletonJoints(iDeviceNumber, i);		
+				
 		for(uint16_t j = 0; j< joints.size(); j++)
 		{
-			gl::drawSolidCircle( Vec2f( joints[j].x * rect.getWidth() + rect.getX1(), joints[j].y * rect.getHeight() + rect.getY1()), fRadius);
+			if(joints[j].m_OrientationConfidence>0)
+			{
+				fRadius = 8.0;
+				gl::pushModelView();
+				gl::translate(joints[j].m_Position.x * rect.getWidth() + rect.getX1(), joints[j].m_Position.y * rect.getHeight() + rect.getY1(), 0);
+				gl::rotate(joints[j].m_Orientation);
+				gl::drawCoordinateFrame(fRadius);
+				gl::popModelView();
+			}
+			else
+			{
+				fRadius = 4.0;
+				glColor3f( 0, 1.0, 0.0 );		
+				gl::drawSolidCircle( Vec2f( joints[j].m_Position.x * rect.getWidth() + rect.getX1(), joints[j].m_Position.y * rect.getHeight() + rect.getY1()), fRadius);
+			}
 		}
 	}	
 	glColor3f( 1.0, 1.0, 1.0 );	
