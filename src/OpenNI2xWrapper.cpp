@@ -78,7 +78,7 @@ bool OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream, bo
 
 	if(iDeviceNumber>=m_DeviceInfoList.getSize())
 	{
-		std::cout << "OpenNI: Failure device number: " << m_DeviceInfoList.getSize() << " not detected --> check drivers abd device manager" << std::endl;
+		std::cout << "OpenNI: Failure device number: " << m_DeviceInfoList.getSize() << " not detected --> check drivers and device manager" << std::endl;
 		return false;
 	}
 
@@ -103,30 +103,30 @@ bool OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream, bo
 
 void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
-	std::lock_guard<std::mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(iDeviceNumber>m_Devices.size()-1)
+		return;
 
-	if(iDeviceNumber<m_Devices.size())
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
+	
+	// not sure if I have to care for cleanup of the streams running, as they are part of the device
+	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
 	{
-		// not sure if I have to care for cleanup of the streams running, as they are part of the device
-		if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
-		{
-			m_Devices[iDeviceNumber]->m_DepthStream.stop();
-			m_Devices[iDeviceNumber]->m_DepthStream.destroy();
-		}
-		if (m_Devices[iDeviceNumber]->m_bRGBStreamActive)
-		{
-			m_Devices[iDeviceNumber]->m_RGBStream.stop();
-			m_Devices[iDeviceNumber]->m_RGBStream.destroy();
-		}
-		if (m_Devices[iDeviceNumber]->m_bIRStreamActive)
-		{
-			m_Devices[iDeviceNumber]->m_IRStream.stop();
-			m_Devices[iDeviceNumber]->m_IRStream.destroy();
-		}
-		
-		m_Devices[iDeviceNumber]->m_Device.close();
-		m_Devices.erase(m_Devices.begin()+iDeviceNumber);
+		m_Devices[iDeviceNumber]->m_DepthStream.stop();
+		m_Devices[iDeviceNumber]->m_DepthStream.destroy();
 	}
+	if (m_Devices[iDeviceNumber]->m_bRGBStreamActive)
+	{
+		m_Devices[iDeviceNumber]->m_RGBStream.stop();
+		m_Devices[iDeviceNumber]->m_RGBStream.destroy();
+	}
+	if (m_Devices[iDeviceNumber]->m_bIRStreamActive)
+	{
+		m_Devices[iDeviceNumber]->m_IRStream.stop();
+		m_Devices[iDeviceNumber]->m_IRStream.destroy();
+	}
+		
+	m_Devices[iDeviceNumber]->m_Device.close();
+	m_Devices.erase(m_Devices.begin()+iDeviceNumber);
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -231,12 +231,12 @@ uint16_t OpenNI2xWrapper::getDeviceNumberForURI(std::string uri)
 	return -1;	// no device with this uri found connected
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfConnectedDevices()
+uint16_t OpenNI2xWrapper::getDevicesConnected()
 {
 	return m_DeviceInfoList.getSize();
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfRunningDevices()
+uint16_t OpenNI2xWrapper::getDevicesRunning()
 {
 	return m_Devices.size();
 }
@@ -279,14 +279,17 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 {
 	int streamReady=-1;
 
+	if(iDeviceNumber>m_Devices.size()-1)
+		return;
+
 	// non-blocking wait --> return if not both streams are ready to process
-	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 1) == openni::STATUS_TIME_OUT || 
-		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 1) == openni::STATUS_TIME_OUT)
+	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT || 
+		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
 	{
 		return; 
 	}
 
-	std::lock_guard<std::mutex> lock(m_Mutex);	// lock for correct shutdown, so no one tries to grab still frames
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct shutdown, so no one tries to grab still frames
 	
 	// user tracking / skeleton tracking
 	uint16_t* pUserImgData;
@@ -504,7 +507,7 @@ void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
 	stopDevice(iRecordId);
 }
 
-uint16_t OpenNI2xWrapper::getNumberOfUsers(uint16_t iDeviceNumber)
+uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
 {
 	return m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers().getSize();
 }
@@ -537,12 +540,13 @@ void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnable
 
 void OpenNI2xWrapper::setBackgroundSubtraction(uint16_t iDeviceNumber, bool bEnabled)
 {
-	m_Devices[iDeviceNumber]->m_bSubtractBackground = bEnabled;
+	if(m_Devices.size()>0)
+		m_Devices[iDeviceNumber]->m_bSubtractBackground = bEnabled;
 }
 
 Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth16BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth16BitSurface)
 		return m_Devices[iDeviceNumber]->m_Depth16BitSurface;
 	else
 		return Surface16u();
@@ -550,7 +554,7 @@ Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth16BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth16BitSurface)
 		m_Devices[iDeviceNumber]->m_Depth16BitTexture = gl::Texture(m_Devices[iDeviceNumber]->m_Depth16BitSurface);
 	
 	return m_Devices[iDeviceNumber]->m_Depth16BitTexture;
@@ -558,7 +562,7 @@ gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_Depth8BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth8BitSurface)
 		return Surface(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
 	else
 		return Surface();
@@ -566,7 +570,7 @@ Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 {	
-	if(m_Devices[iDeviceNumber]->m_Depth8BitSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_Depth8BitSurface)
 		m_Devices[iDeviceNumber]->m_Depth8BitTexture = gl::Texture(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
 	
 	return m_Devices[iDeviceNumber]->m_Depth8BitTexture;
@@ -574,7 +578,7 @@ gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_RGBSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_RGBSurface)
 		return m_Devices[iDeviceNumber]->m_RGBSurface;
 	else
 		return Surface();
@@ -582,7 +586,7 @@ Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_RGBSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_RGBSurface)
 		m_Devices[iDeviceNumber]->m_RGBTexture = gl::Texture(m_Devices[iDeviceNumber]->m_RGBSurface);
 
 	return m_Devices[iDeviceNumber]->m_RGBTexture;
@@ -590,7 +594,7 @@ gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_IRSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_IRSurface)
 		return m_Devices[iDeviceNumber]->m_IRSurface;
 	else
 		return Surface();
@@ -598,7 +602,7 @@ Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_IRSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_IRSurface)
 		m_Devices[iDeviceNumber]->m_IRTexture = gl::Texture(m_Devices[iDeviceNumber]->m_IRSurface);
 
 	return m_Devices[iDeviceNumber]->m_IRTexture;
@@ -606,7 +610,7 @@ gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_UserSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_UserSurface)
 		return m_Devices[iDeviceNumber]->m_UserSurface;
 	else
 		return Surface();
@@ -614,13 +618,13 @@ Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 {
-	if(m_Devices[iDeviceNumber]->m_UserSurface)
+	if(m_Devices.size()>0 && m_Devices[iDeviceNumber]->m_UserSurface)
 		m_Devices[iDeviceNumber]->m_UserTexture = gl::Texture(m_Devices[iDeviceNumber]->m_UserSurface);
 	
 	return m_Devices[iDeviceNumber]->m_UserTexture;
 }
 
-Vec3f OpenNI2xWrapper::getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iUserID)
+Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID)
 {
 	float coordinates[3] = {0};
 
@@ -628,30 +632,47 @@ Vec3f OpenNI2xWrapper::getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iU
 	const nite::UserData& user = users[iUserID];
 
 	m_Devices[iDeviceNumber]->m_pUserTracker->convertJointCoordinatesToDepth(user.getCenterOfMass().x, user.getCenterOfMass().y, user.getCenterOfMass().z, &coordinates[0], &coordinates[1]);
+	// normalize
+	coordinates[0] = coordinates[0] / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
+	coordinates[1] = coordinates[1] / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
 
 	return Vec3f(coordinates[0],coordinates[1],user.getCenterOfMass().z);
 }
 
-std::vector<cinder::Vec3f> OpenNI2xWrapper::getSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser)			
+std::vector<OpenNIJoint> OpenNI2xWrapper::getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUserID)			
 {
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
-	const nite::UserData& user = users[iUser];
+	const nite::UserData& user = users[iUserID];
 	
-	std::vector<cinder::Vec3f> joints;
+	std::vector<OpenNIJoint> joints;
 
 	for(int i=0; i<15; i++)
 	{
 		nite::SkeletonJoint joint =  user.getSkeleton().getJoint((nite::JointType)i);
+		OpenNIJoint tmp;
 		Vec3f pos;
 		m_Devices[iDeviceNumber]->m_pUserTracker->convertJointCoordinatesToDepth(joint.getPosition().x, joint.getPosition().y, joint.getPosition().z, &pos.x, &pos.y);
 		pos.x = pos.x / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
 		pos.y = pos.y / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
 		pos.z=0;
-		joints.push_back(pos);
+		tmp.m_Position = pos;
+		tmp.m_Orientation = ci::Quatf(joint.getOrientation().x, joint.getOrientation().y, joint.getOrientation().z, joint.getOrientation().w);
+		tmp.m_PositionConfidence = joint.getPositionConfidence();
+		tmp.m_OrientationConfidence = joint.getOrientationConfidence();
+		joints.push_back(tmp);
 	}
 	return joints;
 }
 
+ci::Rectf OpenNI2xWrapper::getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID)
+{
+	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
+	const nite::UserData& user = users[iUserID];
+	float w=(float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();
+	float h=(float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();
+	return ci::Rectf(ci::Vec2f(user.getBoundingBox().min.x / w, user.getBoundingBox().min.y / h), 
+		ci::Vec2f(user.getBoundingBox().max.x / w, user.getBoundingBox().max.y / h));
+}
 
 void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 {
@@ -660,13 +681,27 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 	gl::pushMatrices();
 	glLineWidth(2.0);
 		
-	for(uint16_t i = 0; i < getNumberOfUsers(iDeviceNumber); ++i)
+	for(uint16_t i = 0; i < getUserCount(iDeviceNumber); ++i)
 	{	
-		std::vector<cinder::Vec3f> joints = getSkeletonJointPositions(iDeviceNumber, i);		
-		glColor3f( 0, 1.0, 0.0 );				
+		std::vector<OpenNIJoint> joints = getUserSkeletonJoints(iDeviceNumber, i);		
+				
 		for(uint16_t j = 0; j< joints.size(); j++)
 		{
-			gl::drawSolidCircle( Vec2f( joints[j].x * rect.getWidth() + rect.getX1(), joints[j].y * rect.getHeight() + rect.getY1()), fRadius);
+			if(joints[j].m_OrientationConfidence>0)
+			{
+				fRadius = 8.0;
+				gl::pushModelView();
+				gl::translate(joints[j].m_Position.x * rect.getWidth() + rect.getX1(), joints[j].m_Position.y * rect.getHeight() + rect.getY1(), 0);
+				gl::rotate(joints[j].m_Orientation);
+				gl::drawCoordinateFrame(fRadius);
+				gl::popModelView();
+			}
+			else
+			{
+				fRadius = 4.0;
+				glColor3f( 0, 1.0, 0.0 );		
+				gl::drawSolidCircle( Vec2f( joints[j].m_Position.x * rect.getWidth() + rect.getX1(), joints[j].m_Position.y * rect.getHeight() + rect.getY1()), fRadius);
+			}
 		}
 	}	
 	glColor3f( 1.0, 1.0, 1.0 );	
@@ -718,14 +753,20 @@ void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 	if(m_Devices[iDeviceNumber]->m_UserTexture)
 	{
 		gl::draw(m_Devices[iDeviceNumber]->m_UserTexture,  Rectf(x1, (float)windowPos *(float)getWindowHeight()/4.0f, x2, (float)(windowPos+1) * (float)getWindowHeight()/4.0f) );
-		// draw centroids
-		for(int i=0; i<getNumberOfUsers(iDeviceNumber); i++)
+		// draw centroids & bounding boxes
+		for(int i=0; i<getUserCount(iDeviceNumber); i++)
 		{
-			Vec3f pos = getCenterOfMassOfUser(iDeviceNumber, i);
-			pos.x=(pos.x / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getWidth()) * (float)getWindowWidth()/numberOfDevices + x1;
-			pos.y=(pos.y / (float)m_Devices[iDeviceNumber]->m_DepthFrame.getHeight()) * (float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			Vec3f pos = getUserCenterOfMass(iDeviceNumber, i);
+			pos.x=pos.x*(float)getWindowWidth()/numberOfDevices + x1;
+			pos.y=pos.y*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			Rectf bb = getUserBoundingBox(iDeviceNumber, i);
+			bb.x1=bb.x1*(float)getWindowWidth()/numberOfDevices + x1;
+			bb.x2=bb.x2*(float)getWindowWidth()/numberOfDevices + x1;
+			bb.y1=bb.y1*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
+			bb.y2=bb.y2*(float)(getWindowHeight()/4.0f) + (float)windowPos*(float)getWindowHeight()/4.0f;
 			gl::color(1,0,0);
 			gl::drawSolidCircle(Vec2f(pos.x, pos.y),3);
+			gl::drawStrokedRect(bb);
 			gl::color(1,1,1);
 		}
 		windowPos++;

@@ -1,3 +1,29 @@
+/*
+	CADET - Center for Advances in Digital Entertainment Technologies
+	Copyright 2013 University of Applied Science Salzburg / MultiMediaTechnology
+
+	http://www.cadet.at
+	http://multimediatechnology.at/
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+
+	CADET - Center for Advances in Digital Entertainment Technologies
+
+	Authors: Robert Praxmarer
+	Email: support@cadet.at
+	Created: 17-05-2013
+*/
+
 #pragma once
 
 #include "cinder/app/AppBasic.h"
@@ -28,6 +54,8 @@ class OpenNIDevice
 		uint16_t									m_UserCount;
 		openni::PlaybackControl*					m_Player;
 		
+		std::mutex									m_MutexDevice;	
+
 		bool					m_bVisibleUsers[MAX_USERS];
 		nite::SkeletonState		m_SkeletonStates[MAX_USERS];
 		char					m_cUserStatusLabels[MAX_USERS][100];
@@ -65,6 +93,14 @@ class OpenNIDevice
 		ci::gl::Texture							m_DepthDiffTexture;
 };
 
+class OpenNIJoint
+{
+public:
+	cinder::Vec3f m_Position;
+	cinder::Quatf m_Orientation;
+	float m_PositionConfidence;
+	float m_OrientationConfidence;
+};
 
 class OpenNI2xWrapper : public openni::OpenNI::DeviceConnectedListener,
 									public openni::OpenNI::DeviceDisconnectedListener,
@@ -80,10 +116,10 @@ public:
 	void			stopDevice(uint16_t iDeviceNumber);
 	void			updateDevice(uint16_t iDeviceNumber);
 	bool			resetDevice(uint16_t iDeviceNumber);
-	uint16_t		getNumberOfConnectedDevices();
+	uint16_t		getDevicesConnected();
 	uint16_t		getDeviceNumberForURI(std::string uri);
-	uint16_t		getNumberOfRunningDevices();
-	uint16_t		getNumberOfUsers(uint16_t iDeviceNumber);
+	uint16_t		getDevicesRunning();
+	
 	
 	bool			startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed=false);
 	void			stopRecording();
@@ -106,9 +142,12 @@ public:
 	ci::Surface		getUserSurface(uint16_t iDeviceNumber);
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
-	ci::Vec3f					getCenterOfMassOfUser(uint16_t iDeviceNumber, uint16_t iUserID);
+	uint16_t							getUserCount(uint16_t iDeviceNumber);
+	ci::Vec3f							getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
+	ci::Rectf							getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
+	std::vector<OpenNIJoint>			getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
+
 	void						drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect);
-	std::vector<cinder::Vec3f>	getSkeletonJointPositions(uint16_t iDeviceNumber, uint16_t iUser);				//in normalized screen coords 0..1
 	void						debugDraw(uint16_t iDeviceNumber);
 	
 private:
@@ -124,6 +163,7 @@ private:
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
 	std::mutex											m_Mutex;	
+	
 	bool												m_bUserTrackingInitizialized;
 };
 

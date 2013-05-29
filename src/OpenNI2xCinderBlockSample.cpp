@@ -46,7 +46,7 @@ void OpenNI2xCinderBlockSample::prepareSettings( Settings *settings )
 void OpenNI2xCinderBlockSample::setup()
 {
 	m_OpenNI2xBlock.init();
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfConnectedDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)
 		m_OpenNI2xBlock.startDevice(i);
 	
 	m_bMirrored=true;		//this is default for openni
@@ -81,7 +81,7 @@ void OpenNI2xCinderBlockSample::draw()
 {
 	gl::clear();
 
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 	{
 		m_OpenNI2xBlock.updateDevice(i);
 		m_OpenNI2xBlock.debugDraw(i);
@@ -96,28 +96,28 @@ void OpenNI2xCinderBlockSample::draw()
 void OpenNI2xCinderBlockSample::setMirrored()
 {
 	m_bMirrored=!m_bMirrored;
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 		m_OpenNI2xBlock.setAllStreamsMirrored(i, m_bMirrored);
 
 }
 
 void OpenNI2xCinderBlockSample::resetStreams()
 {
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 		m_OpenNI2xBlock.resetDevice(i);
 }
 
 void OpenNI2xCinderBlockSample::alignDepthRGB()
 {
 	m_bAlign=!m_bAlign;
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 		m_OpenNI2xBlock.setDepthColorImageAlignment(i, m_bAlign);
 }
 
 void OpenNI2xCinderBlockSample::subtractBg()
 {
 	m_bSubtractBg=!m_bSubtractBg;
-	for(int i=0; i<m_OpenNI2xBlock.getNumberOfRunningDevices(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 		m_OpenNI2xBlock.setBackgroundSubtraction(i, m_bSubtractBg);
 }
 
