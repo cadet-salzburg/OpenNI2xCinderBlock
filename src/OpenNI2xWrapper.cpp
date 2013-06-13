@@ -679,6 +679,7 @@ bool OpenNI2xWrapper::isOneUserVisible(uint16_t iDeviceNumber)
 	for(int i=0; i < getUserCount(iDeviceNumber); i++)
 		if(isUserVisible(iDeviceNumber, i))
 			return true;
+	return false;
 }
 
 
