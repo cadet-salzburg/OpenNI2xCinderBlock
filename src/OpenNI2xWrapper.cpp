@@ -674,6 +674,23 @@ gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 	return m_Devices[iDeviceNumber]->m_UserTexture;
 }
 
+bool OpenNI2xWrapper::isOneUserVisible(uint16_t iDeviceNumber)
+{
+	for(int i=0; i < getUserCount(iDeviceNumber); i++)
+		if(isUserVisible(iDeviceNumber, i))
+			return true;
+}
+
+
+bool OpenNI2xWrapper::isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID)
+{
+	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
+	if(iUserID < users.getSize())
+		return users[iUserID].isVisible();
+
+	return false;
+}
+
 Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID)
 {
 	float coordinates[3] = {0};

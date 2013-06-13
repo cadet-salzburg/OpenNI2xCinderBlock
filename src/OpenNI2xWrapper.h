@@ -146,6 +146,8 @@ public:
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
 	uint16_t							getUserCount(uint16_t iDeviceNumber);
+	bool								isOneUserVisible(uint16_t iDeviceNumber);
+	bool								isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID);
 	ci::Vec3f							getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
 	ci::Rectf							getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID);						//in normalized screen coords 0..1
 	std::vector<OpenNIJoint>			getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUser);						//in normalized screen coords 0..1
