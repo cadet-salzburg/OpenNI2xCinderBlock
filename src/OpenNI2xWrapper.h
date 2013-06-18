@@ -121,8 +121,8 @@ public:
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getDevicesConnected();
 	int16_t			getRegisteredDeviceNumberForURI(std::string uri);
-	uint16_t		getDevicesRunning();
-	
+	uint16_t		getDevicesInitialized();
+	bool			isDeviceRunning(uint16_t iDeviceNumber);
 	
 	bool			startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed=false);
 	void			stopRecording();

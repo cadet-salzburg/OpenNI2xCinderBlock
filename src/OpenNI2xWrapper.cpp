@@ -23,9 +23,12 @@ void OpenNI2xWrapper::onDeviceStateChanged(const openni::DeviceInfo* pInfo, open
 
 void OpenNI2xWrapper::onDeviceConnected(const openni::DeviceInfo* pInfo)
 {
-	printf("Device \"%s\" connected\n", pInfo->getUri());
-	openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
-	startDevice(pInfo->getUri());
+	if(strcmp(pInfo->getName(),"oni File"))			// only autostart device if it is not an openend recording otherwise recording is opened twice
+	{
+		cout << "Device " << pInfo->getUri() << " connected" << endl;
+		openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
+		startDevice(pInfo->getUri());
+	}
 }
 
 void OpenNI2xWrapper::onDeviceDisconnected(const openni::DeviceInfo* pInfo)
@@ -56,6 +59,7 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 	openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
 	std::cout << "OpenNI: Number of connected OpenNI devices: " << m_DeviceInfoList.getSize() << std::endl;
 
+	m_bUserTrackingInitizialized=false;
 	if(bUseUserTracking)
 	{
 		m_pUserTracker = nullptr;
@@ -118,7 +122,7 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 	{
 		device->m_bRGBStreamActive = bHasRGBStream;
 		device->m_bDepthStreamActive = bHasDepthStream;
-		device->m_bUserStreamActive = bHasUserTracker;
+		device->m_bUserStreamActive = bHasUserTracker && m_bUserTrackingInitizialized;
 		device->m_bIRStreamActive = bHasIRStream;
 		m_Devices.push_back(device);	// push in list of all running devices
 	}
@@ -143,12 +147,20 @@ void OpenNI2xWrapper::stopDevice(std::string uri)
 
 void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
-	
 	if(iDeviceNumber>=m_Devices.size())
 		return;
+
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
 	
+	m_Devices[iDeviceNumber]->m_bIsRunning=false;
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
+	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
+	{
+		//m_Devices[iDeviceNumber]->m_bUserStreamActive=false;
+		m_Devices[iDeviceNumber]->m_pUserTracker->destroy();
+		m_Devices[iDeviceNumber]->m_pUserTracker=nullptr;
+	}
+
 	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
 	{
 		m_Devices[iDeviceNumber]->m_DepthStream.stop();
@@ -166,7 +178,7 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	}
 		
 	m_Devices[iDeviceNumber]->m_Device.close();
-	m_Devices[iDeviceNumber]->m_bIsRunning=false;
+	
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -182,7 +194,9 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 		// maybe one day multiple user tracking will work with openni then comment the following lines 
 		if(m_pUserTracker==nullptr)
 		{
+			cout << "Start User Tracker" << endl;
 			m_pUserTracker = new nite::UserTracker();
+			//device->m_pUserTracker = new nite::UserTracker;			
 			device->m_pUserTracker = m_pUserTracker;
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
@@ -193,12 +207,12 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			}
 		}
 		else 
-			device->m_pUserTracker = m_pUserTracker;
-		// and uncomment this line
-		// device->m_pUserTracker = new nite::UserTracker;			
+		{
+			device->m_pUserTracker = nullptr;
+			device->m_bUserStreamActive=false;
+		}
 	}
 	
-
 	if(bHasRGBStream)
 	{
 		if(device->m_RGBStream.create(device->m_Device, openni::SENSOR_COLOR) == openni::STATUS_OK && device->m_RGBStream.start() == openni::STATUS_OK)
@@ -272,16 +286,29 @@ uint16_t OpenNI2xWrapper::getDevicesConnected()
 	return m_DeviceInfoList.getSize();
 }
 
-uint16_t OpenNI2xWrapper::getDevicesRunning()
+uint16_t OpenNI2xWrapper::getDevicesInitialized()
 {
 	return m_Devices.size();
 }
 
+bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
+		return false;
+	}
+	return m_Devices[iDeviceNumber]->m_bIsRunning;
+}
+
 bool OpenNI2xWrapper::shutdown()
 {
-	std::lock_guard<std::mutex> lock(m_Mutex);	// lock for correct shutdown, so no one tries to grab still frames
-
 	std::cout << "OpenNI: Shutdown" << std::endl;
+
+	for(int i=0; i<m_Devices.size(); i++)
+		stopDevice(i);
+
+	m_Devices.clear();
 
 	nite::NiTE::shutdown();
 	openni::OpenNI::shutdown();
@@ -402,24 +429,25 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	}
 
 	// subtract background if needed
-	if(m_Devices[iDeviceNumber]->m_bSubtractBackground && m_Devices[iDeviceNumber]->m_UserCount>0)
-	{
-		for(int y=0;y<m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();y++)
-			for(int x=0;x<m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();x++)
-				if(pUserImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] == 0)
-				{
-					if(rgbImgData!=nullptr)
+	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
+		if(m_Devices[iDeviceNumber]->m_bSubtractBackground && m_Devices[iDeviceNumber]->m_UserCount>0)
+		{
+			for(int y=0;y<m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();y++)
+				for(int x=0;x<m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();x++)
+					if(pUserImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] == 0)
 					{
-						rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3] = 0;
-						rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 1] = 0;
-						rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 2] = 0;
+						if(rgbImgData!=nullptr)
+						{
+							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3] = 0;
+							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 1] = 0;
+							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 2] = 0;
+						}
+						if(irImgData!=nullptr)
+							irImgData[y*m_Devices[iDeviceNumber]->m_IRFrame.getWidth() + x] = 0;
+						if(depthImgData!=nullptr)
+							depthImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] = 0;
 					}
-					if(irImgData!=nullptr)
-						irImgData[y*m_Devices[iDeviceNumber]->m_IRFrame.getWidth() + x] = 0;
-					if(depthImgData!=nullptr)
-						depthImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] = 0;
-				}
-	}
+		}
 
 	// convert to cinder
 	if(m_Devices[iDeviceNumber]->m_bRGBStreamActive && m_Devices[iDeviceNumber]->m_RGBStream.isValid() && rgbImgData!=nullptr) 
@@ -527,7 +555,7 @@ void OpenNI2xWrapper::stopRecording()
 
 int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device index
 {
-	std::shared_ptr<OpenNIDevice> recorderDevice(new OpenNIDevice);
+	std::shared_ptr<OpenNIDevice> recorderDevice(new OpenNIDevice());
 
 	if(recorderDevice->m_Device.open((fileName).c_str()) != openni::STATUS_OK)
 	{
@@ -555,7 +583,11 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device i
 
 void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
 {
+	if(iRecordId>=m_Devices.size())
+		return;
+
 	stopDevice(iRecordId);
+	m_Devices.erase(m_Devices.begin()+iRecordId);
 }
 
 uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
@@ -565,8 +597,9 @@ uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
 	}
-
-	return m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers().getSize();
+	if(m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers().getSize();
+	return 0;
 }
 
 void OpenNI2xWrapper::setDepthColorImageAlignment(uint16_t iDeviceNumber,  bool bEnabled)
@@ -854,6 +887,9 @@ bool OpenNI2xWrapper::isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID)
 		return false;
 	}
 
+	if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return false;
+
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
 	if(iUserID < users.getSize())
 		return users[iUserID].isVisible();
@@ -868,6 +904,9 @@ Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUse
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Vec3f();
 	}
+
+	if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return Vec3f();
 
 	float coordinates[3] = {0};
 
@@ -889,6 +928,8 @@ std::vector<OpenNIJoint> OpenNI2xWrapper::getUserSkeletonJoints(uint16_t iDevice
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return std::vector<OpenNIJoint>();
 	}
+	if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return std::vector<OpenNIJoint>();
 
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
 	const nite::UserData& user = users[iUserID];
@@ -920,6 +961,8 @@ ci::Rectf OpenNI2xWrapper::getUserBoundingBox(uint16_t iDeviceNumber, uint16_t i
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Rectf();
 	}
+	if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return Rectf();
 
 	const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
 	const nite::UserData& user = users[iUserID];
@@ -936,6 +979,8 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
 	}
+	if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
+		return;
 
 	float fRadius = 4.0;
 	gl::pushMatrices();

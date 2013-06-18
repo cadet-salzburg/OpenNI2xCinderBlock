@@ -81,10 +81,13 @@ void OpenNI2xCinderBlockSample::draw()
 {
 	gl::clear();
 
-	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		m_OpenNI2xBlock.updateDevice(i);
-		m_OpenNI2xBlock.debugDraw(i);
+		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		{
+			m_OpenNI2xBlock.updateDevice(i);
+			m_OpenNI2xBlock.debugDraw(i);
+		}
 	}
 
 	gl::drawString( "fps: " + toString(getAverageFps()), Vec2f( getWindowWidth()-130.0f, 10.0f ), Color(1.0f,0.0f,0.0f), Font("Arial", 20));
@@ -96,29 +99,41 @@ void OpenNI2xCinderBlockSample::draw()
 void OpenNI2xCinderBlockSample::setMirrored()
 {
 	m_bMirrored=!m_bMirrored;
-	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
-		m_OpenNI2xBlock.setAllStreamsMirrored(i, m_bMirrored);
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
+	{
+		if(m_OpenNI2xBlock.isDeviceRunning(i))
+			m_OpenNI2xBlock.setAllStreamsMirrored(i, m_bMirrored);
+	}
 
 }
 
 void OpenNI2xCinderBlockSample::resetStreams()
 {
-	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
-		m_OpenNI2xBlock.resetDevice(i);
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
+	{
+		if(m_OpenNI2xBlock.isDeviceRunning(i))
+			m_OpenNI2xBlock.resetDevice(i);
+	}
 }
 
 void OpenNI2xCinderBlockSample::alignDepthRGB()
 {
 	m_bAlign=!m_bAlign;
-	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
-		m_OpenNI2xBlock.setDepthColorImageAlignment(i, m_bAlign);
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
+	{
+		if(m_OpenNI2xBlock.isDeviceRunning(i))
+			m_OpenNI2xBlock.setDepthColorImageAlignment(i, m_bAlign);
+	}
 }
 
 void OpenNI2xCinderBlockSample::subtractBg()
 {
 	m_bSubtractBg=!m_bSubtractBg;
-	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
-		m_OpenNI2xBlock.setBackgroundSubtraction(i, m_bSubtractBg);
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
+	{
+		if(m_OpenNI2xBlock.isDeviceRunning(i))
+			m_OpenNI2xBlock.setBackgroundSubtraction(i, m_bSubtractBg);
+	}
 }
 
 void OpenNI2xCinderBlockSample::record()
