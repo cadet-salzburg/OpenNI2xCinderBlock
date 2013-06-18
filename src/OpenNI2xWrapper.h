@@ -145,6 +145,15 @@ public:
 	ci::Surface		getUserSurface(uint16_t iDeviceNumber);
 	ci::gl::Texture getUserTexture(uint16_t iDeviceNumber);
 	
+	uint16_t		getRgbWidth(uint16_t iDeviceNumber);
+	uint16_t		getRgbHeight(uint16_t iDeviceNumber);
+	uint16_t		getIrWidth(uint16_t iDeviceNumber);
+	uint16_t		getIrHeight(uint16_t iDeviceNumber);
+	uint16_t		getDepthWidth(uint16_t iDeviceNumber);
+	uint16_t		getDepthHeight(uint16_t iDeviceNumber);
+	uint16_t		getUserWidth(uint16_t iDeviceNumber);
+	uint16_t		getUserHeight(uint16_t iDeviceNumber);
+
 	uint16_t							getUserCount(uint16_t iDeviceNumber);
 	bool								isOneUserVisible(uint16_t iDeviceNumber);
 	bool								isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID);
@@ -158,7 +167,6 @@ public:
 private:
 	bool startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream);
 	void printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts);
-	int16_t getRegisteredDeviceID(std::string uri);
 
 	// overwrite for baseclass of openni for device connection callbacks
 	void onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state);
