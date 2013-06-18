@@ -58,6 +58,7 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 
 	if(bUseUserTracking)
 	{
+		m_pUserTracker = nullptr;
 		niterc = nite::NiTE::initialize();
 		std::cout << "OpenNI: Init Nite " << nite::NiTE::getVersion().major <<  "." << nite::NiTE::getVersion().minor << std::endl;
 	
@@ -142,10 +143,10 @@ void OpenNI2xWrapper::stopDevice(std::string uri)
 
 void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
+	
 	if(iDeviceNumber>=m_Devices.size())
 		return;
-
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
 	
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
 	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
@@ -179,30 +180,24 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	if(m_bUserTrackingInitizialized && bHasUserTracker)
 	{
 		// maybe one day multiple user tracking will work with openni then comment the following lines 
-		static nite::UserTracker* userTracker = new nite::UserTracker();
-		static bool bUserTrackerCreated=false;
-		device->m_pUserTracker = userTracker;
-		// and uncomment this line
-		// device->m_pUserTracker = new nite::UserTracker;
-
-		if(!bUserTrackerCreated)  //usertracker created must be deleted as well when openni would be working with multiple devices user tracking
+		if(m_pUserTracker==nullptr)
 		{
+			m_pUserTracker = new nite::UserTracker();
+			device->m_pUserTracker = m_pUserTracker;
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
 				device->m_bUserStreamActive=false;
 				device->m_pUserTracker->destroy();
+				m_pUserTracker=nullptr;
 				std::cout << "OpenNI: Couldn't create UserSkeletonStream\n" << std::endl;
 			}
-			else
-				bUserTrackerCreated=true;
 		}
-		else
-			device->m_bUserStreamActive=false;			//get rid of this if multiple nite is working but for now when one usertracker is running switch all other userstreams off
+		else 
+			device->m_pUserTracker = m_pUserTracker;
+		// and uncomment this line
+		// device->m_pUserTracker = new nite::UserTracker;			
 	}
-	else if(bHasUserTracker)
-	{
-		std::cout << "OpenNI: UserTracking was not initialized correctly, check your init(...) call, or NITE installation" << std::endl;
-	}
+	
 
 	if(bHasRGBStream)
 	{
@@ -326,7 +321,10 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 {
 	int streamReady=-1;
 
-	if(iDeviceNumber>=m_Devices.size())
+	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct shutdown, so no one tries to grab still frames
+	
+
+	if(iDeviceNumber>=m_Devices.size() || !m_Devices[iDeviceNumber]->m_bIsRunning)
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -336,10 +334,10 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT || 
 		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
 	{
+		//cout << "OpenNI: Device " << iDeviceNumber << " timed out" << endl;
 		return; 
 	}
 
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct shutdown, so no one tries to grab still frames
 	
 	// user tracking / skeleton tracking
 	uint16_t* pUserImgData;

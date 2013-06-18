@@ -173,6 +173,10 @@ private:
 	void onDeviceConnected(const openni::DeviceInfo* pInfo);
 	void onDeviceDisconnected(const openni::DeviceInfo* pInfo);
 
+	// get rid of this once multiple user trackers are supported by nite
+	nite::UserTracker*	m_pUserTracker;
+	bool				m_bUserTrackerCreated;
+
 	std::vector<std::shared_ptr<OpenNIDevice>>			m_Devices;
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
