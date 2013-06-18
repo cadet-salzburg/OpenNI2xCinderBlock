@@ -46,8 +46,8 @@ void OpenNI2xCinderBlockSample::prepareSettings( Settings *settings )
 void OpenNI2xCinderBlockSample::setup()
 {
 	m_OpenNI2xBlock.init();
-	/*for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)*/
-		m_OpenNI2xBlock.startDevice(1);
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)
+		m_OpenNI2xBlock.startDevice(i);
 	
 	m_bMirrored=true;		//this is default for openni
 	m_bAlign=false;
@@ -81,10 +81,10 @@ void OpenNI2xCinderBlockSample::draw()
 {
 	gl::clear();
 
-//	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
+	for(int i=0; i<m_OpenNI2xBlock.getDevicesRunning(); i++)
 	{
-		m_OpenNI2xBlock.updateDevice(1);
-		m_OpenNI2xBlock.debugDraw(1);
+		m_OpenNI2xBlock.updateDevice(i);
+		m_OpenNI2xBlock.debugDraw(i);
 	}
 
 	gl::drawString( "fps: " + toString(getAverageFps()), Vec2f( getWindowWidth()-130.0f, 10.0f ), Color(1.0f,0.0f,0.0f), Font("Arial", 20));

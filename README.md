@@ -33,7 +33,7 @@ Cinder Block for new OpenNI 2.x API (Kinect, PrimeSense and other TOF devices)
 Getting Ready
 -------------
 
-* Install OpenNI 2.2alpha and NITE 2.0.0.12
+* Install OpenNI 2.2alpha and NITE 2.2alpha
 * I am not allowed to redistribute NITE2 with this repo, so you need to copy the content of your NITE2 installation /NITE2/redist to OpenNI2xCinderBlock/bin
 	if you don't do this the app crashes cause it can't find the NITE2.dll
 * If you start the app from within Visual Studio be sure to put the working dir ..\..\bin in the settings, otherwise dlls won't be found
@@ -54,7 +54,7 @@ Known Issues
 * Issues with Microsoft Kinect SDK and Microsoft Drivers (tested for MS SDK v1.6, and 1.7)
 
 	* Features like mirror, align, reset are not working with MS Kinect SDK, they work fine with a PrimeSense Device
-	  You can't install patched avin2 drivers anymore with OpenNI 2.0 
+	  You can't install patched avin2 drivers anymore with OpenNI 2.x
 
 	* When using with Kinect and Windows Kinect drivers just 8bit image information can be retrieved and is shown
 
@@ -73,7 +73,7 @@ Known Issues
 
 TODO
 ----
-* Auto Restart still problems to fix
+* Auto Restart still problems to fix (user tracker is not restarted)
 * Alternative event based implementation (should be way faster as it's threaded,specially for multiple devices)
 * HandTracker
 * device number vs. uri, rewrite functions to work with unique ids

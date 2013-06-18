@@ -268,7 +268,7 @@ int16_t OpenNI2xWrapper::getRegisteredDeviceNumberForURI(std::string uri)
 			return i;
 	}
 	
-	std::cout << "No device registered in system with the specified URI" << std::endl;
+	//std::cout << "No device registered in system with the specified URI" << std::endl;
 	return -1;	// no device with this uri found connected
 }
 
