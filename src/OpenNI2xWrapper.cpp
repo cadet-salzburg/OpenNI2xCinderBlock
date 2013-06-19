@@ -187,7 +187,10 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	
 	// cleanup memory
 	if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr != nullptr)
+	{
 		delete m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr;
+		m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr = nullptr;
+	}
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -201,11 +204,12 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	if(m_bUserTrackingInitizialized && bHasUserTracker)
 	{
 		// maybe one day multiple user tracking will work with openni then comment the following lines 
+		// and make a user tracker per device  --> device->m_pUserTracker = new nite::UserTracker;
 		if(m_pUserTracker==nullptr)
 		{
 			cout << "Start User Tracker" << endl;
 			m_pUserTracker = new nite::UserTracker();
-			//device->m_pUserTracker = new nite::UserTracker;			
+						
 			device->m_pUserTracker = m_pUserTracker;
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
