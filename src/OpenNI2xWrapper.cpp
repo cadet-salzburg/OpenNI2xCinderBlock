@@ -16,6 +16,12 @@ OpenNI2xWrapper::~OpenNI2xWrapper(void)
 	std::cout << "over and out" << std::endl;
 }
 
+OpenNI2xWrapper& OpenNI2xWrapper::getInstance()
+{
+	static OpenNI2xWrapper instance;
+	return instance;
+}
+
 void OpenNI2xWrapper::onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state) 
 {
 	printf("Device \"%s\" error state changed to %d\n", pInfo->getUri(), state);
@@ -179,6 +185,9 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 		
 	m_Devices[iDeviceNumber]->m_Device.close();
 	
+	// cleanup memory
+	if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr != nullptr)
+		delete m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr;
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -305,7 +314,7 @@ bool OpenNI2xWrapper::shutdown()
 {
 	std::cout << "OpenNI: Shutdown" << std::endl;
 
-	for(int i=0; i<m_Devices.size(); i++)
+	for(uint16_t i=0; i<m_Devices.size(); i++)
 		stopDevice(i);
 
 	m_Devices.clear();
@@ -367,7 +376,6 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 
 	
 	// user tracking / skeleton tracking
-	uint16_t* pUserImgData;
 	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
 	{
 		nite::Status niteRc = m_Devices[iDeviceNumber]->m_pUserTracker->readFrame(&m_Devices[iDeviceNumber]->m_UserTrackerFrame);
@@ -376,13 +384,13 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 		if(niteRc == nite::STATUS_OK)
 		{
 			const nite::UserMap& userLabels = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUserMap();
-			pUserImgData = (uint16_t*)userLabels.getPixels();
+			m_Devices[iDeviceNumber]->m_pUserRawPtr = (uint16_t*)userLabels.getPixels();
 			for(int y=0;y<m_Devices[iDeviceNumber]->m_iDepthImgHeight;y++)
 				for(int x=0;x<m_Devices[iDeviceNumber]->m_iDepthImgWidth;x++)
-					if(pUserImgData[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] >0)
-						pUserImgData[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] = UINT16_MAX;
+					if(m_Devices[iDeviceNumber]->m_pUserRawPtr[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] >0)
+						m_Devices[iDeviceNumber]->m_pUserRawPtr[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] = UINT16_MAX;
 
-			m_Devices[iDeviceNumber]->m_UserSurface = Surface(Channel16u(m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_DepthFrame.getStrideInBytes(), 1, pUserImgData));
+			m_Devices[iDeviceNumber]->m_UserSurface = Surface(Channel16u(m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_DepthFrame.getStrideInBytes(), 1, m_Devices[iDeviceNumber]->m_pUserRawPtr));
 			
 			const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
 			m_Devices[iDeviceNumber]->m_UserCount = users.getSize();
@@ -401,14 +409,11 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	}
 	
 	// read streams image data
-	uint8_t* rgbImgData=nullptr;
-	uint8_t* irImgData=nullptr;
-	uint16_t* depthImgData=nullptr;
 	// rgb stream
 	if(m_Devices[iDeviceNumber]->m_bRGBStreamActive && m_Devices[iDeviceNumber]->m_RGBStream.isValid()) 
 	{
 		if(m_Devices[iDeviceNumber]->m_RGBStream.readFrame(&m_Devices[iDeviceNumber]->m_RGBFrame) ==openni::STATUS_OK)
-			rgbImgData = (uint8_t*)m_Devices[iDeviceNumber]->m_RGBFrame.getData();
+			m_Devices[iDeviceNumber]->m_pRgbRawPtr = (uint8_t*)m_Devices[iDeviceNumber]->m_RGBFrame.getData();
 	}
 	// depth stream		
 	if(m_Devices[iDeviceNumber]->m_bDepthStreamActive && m_Devices[iDeviceNumber]->m_DepthStream.isValid())
@@ -416,16 +421,16 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 		if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
 		{
 			if(m_Devices[iDeviceNumber]->m_DepthStream.readFrame(&m_Devices[iDeviceNumber]->m_DepthFrame)== openni::STATUS_OK)		// just get depth frame if not already polled before otherwise user and depth image aren't synced
-				depthImgData = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();
+				m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();
 		}
 		else
-			depthImgData = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();	// just get the data and not read the frame anew as this has been done already in the user read frame above
+			m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();	// just get the data and not read the frame anew as this has been done already in the user read frame above
 	}
 	// ir stream
 	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid())
 	{
 		if(m_Devices[iDeviceNumber]->m_IRStream.readFrame(&m_Devices[iDeviceNumber]->m_IRFrame) == openni::STATUS_OK)
-			irImgData = (uint8_t*)m_Devices[iDeviceNumber]->m_IRFrame.getData();
+			m_Devices[iDeviceNumber]->m_pIrRawPtr = (uint8_t*)m_Devices[iDeviceNumber]->m_IRFrame.getData();
 	}
 
 	// subtract background if needed
@@ -434,45 +439,45 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 		{
 			for(int y=0;y<m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();y++)
 				for(int x=0;x<m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();x++)
-					if(pUserImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] == 0)
+					if(m_Devices[iDeviceNumber]->m_pUserRawPtr[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] == 0)
 					{
-						if(rgbImgData!=nullptr)
+						if(m_Devices[iDeviceNumber]->m_pRgbRawPtr!=nullptr)
 						{
-							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3] = 0;
-							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 1] = 0;
-							rgbImgData[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 2] = 0;
+							m_Devices[iDeviceNumber]->m_pRgbRawPtr[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3] = 0;
+							m_Devices[iDeviceNumber]->m_pRgbRawPtr[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 1] = 0;
+							m_Devices[iDeviceNumber]->m_pRgbRawPtr[y*m_Devices[iDeviceNumber]->m_RGBFrame.getWidth()*3 + x*3 + 2] = 0;
 						}
-						if(irImgData!=nullptr)
-							irImgData[y*m_Devices[iDeviceNumber]->m_IRFrame.getWidth() + x] = 0;
-						if(depthImgData!=nullptr)
-							depthImgData[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] = 0;
+						if(m_Devices[iDeviceNumber]->m_pIrRawPtr!=nullptr)
+							m_Devices[iDeviceNumber]->m_pIrRawPtr[y*m_Devices[iDeviceNumber]->m_IRFrame.getWidth() + x] = 0;
+						if(m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr!=nullptr)
+							m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr[y*m_Devices[iDeviceNumber]->m_DepthFrame.getWidth() + x] = 0;
 					}
 		}
 
 	// convert to cinder
-	if(m_Devices[iDeviceNumber]->m_bRGBStreamActive && m_Devices[iDeviceNumber]->m_RGBStream.isValid() && rgbImgData!=nullptr) 
+	if(m_Devices[iDeviceNumber]->m_bRGBStreamActive && m_Devices[iDeviceNumber]->m_RGBStream.isValid() && m_Devices[iDeviceNumber]->m_pRgbRawPtr!=nullptr) 
 	{
-		m_Devices[iDeviceNumber]->m_RGBSurface = Surface8u(rgbImgData,  m_Devices[iDeviceNumber]->m_iRgbImgWidth, m_Devices[iDeviceNumber]->m_iRgbImgHeight, m_Devices[iDeviceNumber]->m_RGBFrame.getStrideInBytes(), SurfaceChannelOrder::RGB);
+		m_Devices[iDeviceNumber]->m_RGBSurface = Surface8u(m_Devices[iDeviceNumber]->m_pRgbRawPtr,  m_Devices[iDeviceNumber]->m_iRgbImgWidth, m_Devices[iDeviceNumber]->m_iRgbImgHeight, m_Devices[iDeviceNumber]->m_RGBFrame.getStrideInBytes(), SurfaceChannelOrder::RGB);
 	}
-	if(m_Devices[iDeviceNumber]->m_bDepthStreamActive && m_Devices[iDeviceNumber]->m_DepthStream.isValid() && depthImgData!=nullptr)
+	if(m_Devices[iDeviceNumber]->m_bDepthStreamActive && m_Devices[iDeviceNumber]->m_DepthStream.isValid() && m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr!=nullptr)
 	{
-		m_Devices[iDeviceNumber]->m_Depth16BitSurface = Surface16u(Channel16u( m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_DepthFrame.getStrideInBytes(), 1, depthImgData));
+		m_Devices[iDeviceNumber]->m_Depth16BitSurface = Surface16u(Channel16u( m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_DepthFrame.getStrideInBytes(), 1, m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr));
 		
 		// normalizing values for 8bit depth display, this is done every frame, so not very performant
 		uint32_t size=m_Devices[iDeviceNumber]->m_iDepthImgWidth * m_Devices[iDeviceNumber]->m_iDepthImgHeight;
-		unsigned char*  img = new unsigned char[size];
+		if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr == nullptr)
+			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr =  new unsigned char[size];
 		int normalizing = 10000; // 10meters max 
 		for( unsigned int i=0; i<size; ++i )
 		{
-			img[i] = (unsigned char) ( depthImgData[i] * ( (float)( 255 ) / normalizing ) ); 	
+			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr[i] = (unsigned char) ( m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr[i] * ( (float)( 255 ) / normalizing ) ); 	
 		}
 		m_Devices[iDeviceNumber]->m_Depth8BitSurface = Surface(Channel(m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_iDepthImgWidth
-			, sizeof(char), img)).clone();
-		delete img;
+			, sizeof(char), m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr)).clone();
 	}
-	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid() && irImgData!=nullptr)
+	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid() && m_Devices[iDeviceNumber]->m_pIrRawPtr!=nullptr)
 	{
-		m_Devices[iDeviceNumber]->m_IRSurface = Surface8u(Channel8u(m_Devices[iDeviceNumber]->m_iIRImgWidth, m_Devices[iDeviceNumber]->m_iIRImgHeight, m_Devices[iDeviceNumber]->m_IRFrame.getStrideInBytes(), 1, irImgData));
+		m_Devices[iDeviceNumber]->m_IRSurface = Surface8u(Channel8u(m_Devices[iDeviceNumber]->m_iIRImgWidth, m_Devices[iDeviceNumber]->m_iIRImgHeight, m_Devices[iDeviceNumber]->m_IRFrame.getStrideInBytes(), 1, m_Devices[iDeviceNumber]->m_pIrRawPtr));
 	}
 	
 }
@@ -868,6 +873,56 @@ gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 		m_Devices[iDeviceNumber]->m_UserTexture = gl::Texture(m_Devices[iDeviceNumber]->m_UserSurface);
 	
 	return m_Devices[iDeviceNumber]->m_UserTexture;
+}
+
+uint16_t* OpenNI2xWrapper::getDepth16BitImgPtr(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
+		return nullptr;
+	}
+	return 	m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr;
+}
+
+uint8_t* OpenNI2xWrapper::getDepth8BitImgPtr(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
+		return nullptr;
+	}
+	return 	m_Devices[iDeviceNumber]->m_pRgbRawPtr;
+}
+
+uint8_t* OpenNI2xWrapper::getRgbImgPtr(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
+		return nullptr;
+	}
+	return 	m_Devices[iDeviceNumber]->m_pRgbRawPtr;
+}
+
+uint8_t* OpenNI2xWrapper::getIrImgPtr(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
+		return nullptr;
+	}
+	return m_Devices[iDeviceNumber]->m_pIrRawPtr;
+}
+
+uint16_t* OpenNI2xWrapper::getUserImgPtr(uint16_t iDeviceNumber)
+{
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
+		return nullptr;
+	}
+	return m_Devices[iDeviceNumber]->m_pUserRawPtr;
 }
 
 bool OpenNI2xWrapper::isOneUserVisible(uint16_t iDeviceNumber)

@@ -39,6 +39,16 @@
 class OpenNIDevice
 {
 	public:	
+		OpenNIDevice()
+		{
+			// default initialization
+			m_pDepth16BitRawPtr = nullptr;
+			m_pDepth8BitRawPtr = nullptr;
+			m_pRgbRawPtr = nullptr;
+			m_pIrRawPtr = nullptr;
+			m_pUserRawPtr = nullptr;
+		};
+
 		openni::Device								m_Device;
 		openni::VideoStream**						m_pStreams;
 		openni::VideoStream							m_RGBStream;
@@ -76,6 +86,12 @@ class OpenNIDevice
 		bool	m_bUserStreamActive;
 		bool	m_bSubtractBackground;
 
+		uint16_t*		m_pDepth16BitRawPtr;
+		uint8_t*		m_pDepth8BitRawPtr;
+		uint8_t*		m_pRgbRawPtr;
+		uint8_t*		m_pIrRawPtr;
+		uint16_t*		m_pUserRawPtr;
+
 		ci::Surface								m_RGBSurface;
 		ci::Surface								m_IRSurface;
 		ci::Surface16u							m_Depth16BitSurface;
@@ -108,7 +124,7 @@ class OpenNI2xWrapper : public openni::OpenNI::DeviceConnectedListener,
 									public openni::OpenNI::DeviceStateChangedListener
 {
 public:
-	OpenNI2xWrapper(void);
+	static OpenNI2xWrapper& getInstance();
 	~OpenNI2xWrapper(void);
 
 	bool			init(bool bUseUserTracking=true);
@@ -154,6 +170,12 @@ public:
 	uint16_t		getUserWidth(uint16_t iDeviceNumber);
 	uint16_t		getUserHeight(uint16_t iDeviceNumber);
 
+	uint16_t*		getDepth16BitImgPtr(uint16_t iDeviceNumber);
+	uint8_t*		getDepth8BitImgPtr(uint16_t iDeviceNumber);
+	uint8_t*		getRgbImgPtr(uint16_t iDeviceNumber);
+	uint8_t*		getIrImgPtr(uint16_t iDeviceNumber);
+	uint16_t*		getUserImgPtr(uint16_t iDeviceNumber);
+
 	uint16_t							getUserCount(uint16_t iDeviceNumber);
 	bool								isOneUserVisible(uint16_t iDeviceNumber);
 	bool								isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID);
@@ -165,6 +187,9 @@ public:
 	void						debugDraw(uint16_t iDeviceNumber);
 	
 private:
+	OpenNI2xWrapper(void);
+	OpenNI2xWrapper(OpenNI2xWrapper& other){};
+
 	bool startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream);
 	void printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts);
 

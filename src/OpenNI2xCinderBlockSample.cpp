@@ -11,6 +11,7 @@ using namespace std;
 // We'll create a new Cinder Application by deriving from the AppBasic class
 class OpenNI2xCinderBlockSample : public AppBasic {
   public:
+	OpenNI2xCinderBlockSample() : m_OpenNI2xBlock(OpenNI2xWrapper::getInstance()) {};
 	void prepareSettings( Settings *settings );
 	void setup();
 	void keyDown( KeyEvent event );
@@ -26,7 +27,7 @@ class OpenNI2xCinderBlockSample : public AppBasic {
 	void play();
 	void stop();
 
-	OpenNI2xWrapper			m_OpenNI2xBlock;
+	OpenNI2xWrapper&		m_OpenNI2xBlock;
 	params::InterfaceGlRef	m_Params;
 	bool					m_bMirrored;
 	bool					m_bAlign;

@@ -73,7 +73,7 @@ Known Issues
 
 TODO
 ----
-* sometimes crashes on close
+* user tracker crashes on close
 * Auto Restart still problems to fix (user tracker is not restarted)
 * Alternative event based implementation (should be way faster as it's threaded,specially for multiple devices)
 * HandTracker
