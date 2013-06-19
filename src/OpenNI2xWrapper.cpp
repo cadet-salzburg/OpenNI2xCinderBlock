@@ -66,9 +66,9 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 	std::cout << "OpenNI: Number of connected OpenNI devices: " << m_DeviceInfoList.getSize() << std::endl;
 
 	m_bUserTrackingInitizialized=false;
+	m_bIsUserTrackerRunning = false;
 	if(bUseUserTracking)
 	{
-		m_pUserTracker = nullptr;
 		niterc = nite::NiTE::initialize();
 		std::cout << "OpenNI: Init Nite " << nite::NiTE::getVersion().major <<  "." << nite::NiTE::getVersion().minor << std::endl;
 	
@@ -103,6 +103,8 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 		std::cout << "OpenNI: Failure device number: " << m_DeviceInfoList.getSize() << " not detected --> check drivers and device manager" << std::endl;
 		return -1;
 	}
+
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
 	std::shared_ptr<OpenNIDevice> device;
 
@@ -156,14 +158,16 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	if(iDeviceNumber>=m_Devices.size())
 		return;
 
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	
 	m_Devices[iDeviceNumber]->m_bIsRunning=false;
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
 	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
 	{
-		m_Devices[iDeviceNumber]->m_pUserTracker->destroy();
+		m_bIsUserTrackerRunning=false;
+		delete m_Devices[iDeviceNumber]->m_pUserTracker;
 		m_Devices[iDeviceNumber]->m_pUserTracker=nullptr;
+		nite::NiTE::shutdown();
 	}
 
 	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
@@ -194,32 +198,37 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
 {
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct asynchronous calls of update and stop
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 
 	int streamCount=0;
 	std::shared_ptr<OpenNIDevice> device = m_Devices[iDeviceNumber];
 	device->m_pStreams = new openni::VideoStream*[2];
 
+	
 	if(m_bUserTrackingInitizialized && bHasUserTracker)
 	{
 		// maybe one day multiple user tracking will work with openni then comment the following lines 
 		// and make a user tracker per device  --> device->m_pUserTracker = new nite::UserTracker;
-		if(m_pUserTracker==nullptr)
+		if(!m_bIsUserTrackerRunning && device->m_pUserTracker==nullptr)
 		{
 			cout << "Start User Tracker" << endl;
-			m_pUserTracker = new nite::UserTracker();
-						
-			device->m_pUserTracker = m_pUserTracker;
+			nite::NiTE::initialize();
+			device->m_pUserTracker =  new nite::UserTracker();
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
 				device->m_bUserStreamActive=false;
 				device->m_pUserTracker->destroy();
-				m_pUserTracker=nullptr;
+				device->m_pUserTracker=nullptr;
 				std::cout << "OpenNI: Couldn't create UserSkeletonStream\n" << std::endl;
+			}
+			else
+			{
+				m_bIsUserTrackerRunning=true;
 			}
 		}
 		else 
 		{
+			m_bIsUserTrackerRunning=false;
 			device->m_pUserTracker = nullptr;
 			device->m_bUserStreamActive=false;
 		}
@@ -274,8 +283,9 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	setDepthColorImageAlignment(iDeviceNumber, true);
 	setBackgroundSubtraction(iDeviceNumber, false);
 
-	// seems to work now with new openni not tested with kinect yet
-	setDepthColorSync(iDeviceNumber, true);
+	// freezes the app
+	//setDepthColorSync(iDeviceNumber, true);
+	
 
 	device->m_bIsRunning=true;
 	return true;
@@ -295,16 +305,20 @@ int16_t OpenNI2xWrapper::getRegisteredDeviceNumberForURI(std::string uri)
 
 uint16_t OpenNI2xWrapper::getDevicesConnected()
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 	return m_DeviceInfoList.getSize();
 }
 
 uint16_t OpenNI2xWrapper::getDevicesInitialized()
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 	return m_Devices.size();
 }
 
 bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	if(iDeviceNumber>=m_Devices.size())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
@@ -315,15 +329,18 @@ bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
 
 bool OpenNI2xWrapper::shutdown()
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+	
 	std::cout << "OpenNI: Shutdown" << std::endl;
 
-	for(uint16_t i=0; i<m_Devices.size(); i++)
-		stopDevice(i);
-
-	m_Devices.clear();
 
 	nite::NiTE::shutdown();
 	openni::OpenNI::shutdown();
+	
+	/*for(uint16_t i=0; i<m_Devices.size(); i++)
+		stopDevice(i);
+
+	m_Devices.clear();*/
 
 	return true;
 }
@@ -359,9 +376,9 @@ bool OpenNI2xWrapper::resetDevice(uint16_t iDeviceNumber)
 void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 {
 	int streamReady=-1;
-
-	std::lock_guard<std::mutex> lock(m_Devices[iDeviceNumber]->m_MutexDevice);	// lock for correct shutdown, so no one tries to grab still frames
 	
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 
 	if(iDeviceNumber>=m_Devices.size() || !m_Devices[iDeviceNumber]->m_bIsRunning)
 	{
@@ -372,7 +389,6 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	// non-blocking wait --> return if not both streams are ready to process
 	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT ||
 	openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
-//	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 2, &streamReady) == openni::STATUS_TIME_OUT)
 	{
 		//cout << "OpenNI: Device " << iDeviceNumber << " timed out" << endl;
 		return; 
@@ -380,7 +396,7 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 
 	
 	// user tracking / skeleton tracking
-	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
+	if(m_bIsUserTrackerRunning && m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
 	{
 		nite::Status niteRc = m_Devices[iDeviceNumber]->m_pUserTracker->readFrame(&m_Devices[iDeviceNumber]->m_UserTrackerFrame);
 		m_Devices[iDeviceNumber]->m_DepthFrame = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getDepthFrame();
@@ -1075,6 +1091,8 @@ void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 
 void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	if(iDeviceNumber>=m_Devices.size())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;

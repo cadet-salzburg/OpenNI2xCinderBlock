@@ -47,6 +47,12 @@ class OpenNIDevice
 			m_pRgbRawPtr = nullptr;
 			m_pIrRawPtr = nullptr;
 			m_pUserRawPtr = nullptr;
+			m_pUserTracker = nullptr;
+			m_bRGBStreamActive = false;
+			m_bIRStreamActive = false;
+			m_bDepthStreamActive = false;
+			m_bUserStreamActive = false;
+			m_bSubtractBackground = false;
 		};
 
 		openni::Device								m_Device;
@@ -64,7 +70,6 @@ class OpenNIDevice
 		uint16_t									m_UserCount;
 		openni::PlaybackControl*					m_Player;
 		bool										m_bIsRunning;
-		std::mutex									m_MutexDevice;	
 		std::string									m_Uri;
 
 		bool					m_bVisibleUsers[MAX_USERS];
@@ -198,15 +203,11 @@ private:
 	void onDeviceConnected(const openni::DeviceInfo* pInfo);
 	void onDeviceDisconnected(const openni::DeviceInfo* pInfo);
 
-	// get rid of this once multiple user trackers are supported by nite
-	nite::UserTracker*	m_pUserTracker;
-	bool				m_bUserTrackerCreated;
-
 	std::vector<std::shared_ptr<OpenNIDevice>>			m_Devices;
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
-	std::mutex											m_Mutex;	
-	
+	std::recursive_mutex											m_Mutex;	
+	bool												m_bIsUserTrackerRunning;
 	bool												m_bUserTrackingInitizialized;
 };
 
