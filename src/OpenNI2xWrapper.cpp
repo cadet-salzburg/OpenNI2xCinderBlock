@@ -162,7 +162,6 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
 	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
 	{
-		//m_Devices[iDeviceNumber]->m_bUserStreamActive=false;
 		m_Devices[iDeviceNumber]->m_pUserTracker->destroy();
 		m_Devices[iDeviceNumber]->m_pUserTracker=nullptr;
 	}
@@ -275,8 +274,8 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	setDepthColorImageAlignment(iDeviceNumber, true);
 	setBackgroundSubtraction(iDeviceNumber, false);
 
-	// does freeze seems to be an issue of OpenNI
-	//setDepthColorSync(iDeviceNumber, false);
+	// seems to work now with new openni not tested with kinect yet
+	setDepthColorSync(iDeviceNumber, true);
 
 	device->m_bIsRunning=true;
 	return true;
@@ -371,8 +370,9 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	}
 
 	// non-blocking wait --> return if not both streams are ready to process
-	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT || 
-		openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
+	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT ||
+	openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
+//	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 2, &streamReady) == openni::STATUS_TIME_OUT)
 	{
 		//cout << "OpenNI: Device " << iDeviceNumber << " timed out" << endl;
 		return; 
@@ -628,7 +628,7 @@ void OpenNI2xWrapper::setDepthColorImageAlignment(uint16_t iDeviceNumber,  bool 
 void OpenNI2xWrapper::setDepthColorSync(uint16_t iDeviceNumber, bool bEnabled)
 {
 	// freezes app this is a bug in openni
-	//m_Devices[iDeviceNumber]->m_Device.setDepthColorSyncEnabled(bEnabled);
+	m_Devices[iDeviceNumber]->m_Device.setDepthColorSyncEnabled(bEnabled);
 }
 
 void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnabled)
