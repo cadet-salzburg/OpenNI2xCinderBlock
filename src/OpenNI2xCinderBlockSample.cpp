@@ -76,6 +76,9 @@ void OpenNI2xCinderBlockSample::keyDown( KeyEvent event )
 {
 	if( event.getChar() == 'f' )
 		setFullScreen( ! isFullScreen() );
+	if( event.getChar() == 'r' )
+		m_OpenNI2xBlock.resetDevice(0);
+
 }
 
 void OpenNI2xCinderBlockSample::draw()

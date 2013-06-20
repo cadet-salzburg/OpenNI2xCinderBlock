@@ -29,6 +29,8 @@ void OpenNI2xWrapper::onDeviceStateChanged(const openni::DeviceInfo* pInfo, open
 
 void OpenNI2xWrapper::onDeviceConnected(const openni::DeviceInfo* pInfo)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	if(strcmp(pInfo->getName(),"oni File"))			// only autostart device if it is not an openend recording otherwise recording is opened twice
 	{
 		cout << "Device " << pInfo->getUri() << " connected" << endl;
@@ -39,6 +41,8 @@ void OpenNI2xWrapper::onDeviceConnected(const openni::DeviceInfo* pInfo)
 
 void OpenNI2xWrapper::onDeviceDisconnected(const openni::DeviceInfo* pInfo)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	printf("Device \"%s\" disconnected\n", pInfo->getUri());
 	stopDevice(pInfo->getUri());
 	openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
@@ -56,14 +60,7 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 		std::cout << "OpenNI: Couldn't initialize OpenNI, check for installs, environments vars, dlls and if you have set ..\\..\\bin as working dir in visual studio " << openni::OpenNI::getExtendedError() << std::endl;
 		return false;
 	}
-
-	//register device connection state listeners
-	openni::OpenNI::addDeviceConnectedListener(this);
-	openni::OpenNI::addDeviceDisconnectedListener(this);
-	openni::OpenNI::addDeviceStateChangedListener(this);
-
-	openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
-	std::cout << "OpenNI: Number of connected OpenNI devices: " << m_DeviceInfoList.getSize() << std::endl;
+		
 
 	m_bUserTrackingInitizialized=false;
 	m_bIsUserTrackerRunning = false;
@@ -79,6 +76,15 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 		}
 		m_bUserTrackingInitizialized = true;
 	}
+
+	//register device connection state listeners
+	openni::OpenNI::addDeviceConnectedListener(this);
+	openni::OpenNI::addDeviceDisconnectedListener(this);
+	openni::OpenNI::addDeviceStateChangedListener(this);
+
+	openni::OpenNI::enumerateDevices(&m_DeviceInfoList);			// count connected devices
+	std::cout << "OpenNI: Number of connected OpenNI devices: " << m_DeviceInfoList.getSize() << std::endl;
+
 	return true;
 }
 
@@ -118,12 +124,14 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 	}
 	else
 		device = m_Devices[registeredID];
-
-	rc = device->m_Device.open(device->m_Uri.c_str());
-	if (rc != openni::STATUS_OK)
+	if(! device->m_Device.isValid())
 	{
-		printf("OpenNI: Device open failed:\n%s\n", openni::OpenNI::getExtendedError());
-		return -1;
+		rc = device->m_Device.open(device->m_Uri.c_str());
+		if (rc != openni::STATUS_OK)
+		{
+			printf("OpenNI: Device open failed:\n%s\n", openni::OpenNI::getExtendedError());
+			return -1;
+		}
 	}
 	
 	if(registeredID==-1)
@@ -157,7 +165,7 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
 	if(iDeviceNumber>=m_Devices.size())
 		return;
-
+	
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	
 	m_Devices[iDeviceNumber]->m_bIsRunning=false;
@@ -165,9 +173,9 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
 	{
 		m_bIsUserTrackerRunning=false;
-		delete m_Devices[iDeviceNumber]->m_pUserTracker;
+		m_Devices[iDeviceNumber]->m_UserTrackerFrame.release();
+		m_Devices[iDeviceNumber]->m_pUserTracker->destroy();
 		m_Devices[iDeviceNumber]->m_pUserTracker=nullptr;
-		nite::NiTE::shutdown();
 	}
 
 	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
@@ -187,8 +195,8 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	}
 		
 	m_Devices[iDeviceNumber]->m_Device.close();
-	
-	// cleanup memory
+	//
+	//// cleanup memory
 	if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr != nullptr)
 	{
 		delete m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr;
@@ -212,14 +220,14 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 		if(!m_bIsUserTrackerRunning && device->m_pUserTracker==nullptr)
 		{
 			cout << "Start User Tracker" << endl;
-			nite::NiTE::initialize();
 			device->m_pUserTracker =  new nite::UserTracker();
+		
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
 				device->m_bUserStreamActive=false;
 				device->m_pUserTracker->destroy();
 				device->m_pUserTracker=nullptr;
-				std::cout << "OpenNI: Couldn't create UserSkeletonStream\n" << std::endl;
+				std::cout << "OpenNI: Couldn't create UserStream\n" << std::endl;
 			}
 			else
 			{
@@ -286,7 +294,6 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	// freezes the app
 	//setDepthColorSync(iDeviceNumber, true);
 	
-
 	device->m_bIsRunning=true;
 	return true;
 }
@@ -347,28 +354,18 @@ bool OpenNI2xWrapper::shutdown()
 
 bool OpenNI2xWrapper::resetDevice(uint16_t iDeviceNumber)
 {
+
 	if(iDeviceNumber>=m_Devices.size())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
 		return false;
 	}
+	
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);
 
 	std::cout << "OpenNI: Reset Device " << iDeviceNumber << " " << std::endl;
-	if (m_Devices[iDeviceNumber]->m_bDepthStreamActive) 
-	{
-		m_Devices[iDeviceNumber]->m_DepthStream.stop();
-		m_Devices[iDeviceNumber]->m_DepthStream.start();
-	}
-	if (m_Devices[iDeviceNumber]->m_bRGBStreamActive)
-	{
-		m_Devices[iDeviceNumber]->m_RGBStream.stop();
-		m_Devices[iDeviceNumber]->m_RGBStream.start();
-	}
-	if (m_Devices[iDeviceNumber]->m_bIRStreamActive)
-	{
-		m_Devices[iDeviceNumber]->m_IRStream.stop();
-		m_Devices[iDeviceNumber]->m_IRStream.start();
-	}
+	stopDevice(iDeviceNumber);
+	startDevice(iDeviceNumber);
 
 	return true;
 }
