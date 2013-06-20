@@ -206,8 +206,7 @@ private:
 	std::vector<std::shared_ptr<OpenNIDevice>>			m_Devices;
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
-	std::recursive_mutex											m_Mutex;	
-	bool												m_bIsUserTrackerRunning;
+	std::recursive_mutex								m_Mutex;	
 	bool												m_bUserTrackingInitizialized;
 };
 

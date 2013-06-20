@@ -63,7 +63,7 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 		
 
 	m_bUserTrackingInitizialized=false;
-	m_bIsUserTrackerRunning = false;
+	
 	if(bUseUserTracking)
 	{
 		niterc = nite::NiTE::initialize();
@@ -172,7 +172,6 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
 	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
 	{
-		m_bIsUserTrackerRunning=false;
 		m_Devices[iDeviceNumber]->m_UserTrackerFrame.release();
 		m_Devices[iDeviceNumber]->m_pUserTracker->destroy();
 		m_Devices[iDeviceNumber]->m_pUserTracker=nullptr;
@@ -215,30 +214,19 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	
 	if(m_bUserTrackingInitizialized && bHasUserTracker)
 	{
-		// maybe one day multiple user tracking will work with openni then comment the following lines 
-		// and make a user tracker per device  --> device->m_pUserTracker = new nite::UserTracker;
-		if(!m_bIsUserTrackerRunning && device->m_pUserTracker==nullptr)
+		if( device->m_pUserTracker==nullptr)
 		{
 			cout << "Start User Tracker" << endl;
-			device->m_pUserTracker =  new nite::UserTracker();
+			device->m_pUserTracker =   new nite::UserTracker();
 		
 			if(device->m_pUserTracker->create(&(device->m_Device)) != nite::STATUS_OK)
 			{
 				device->m_bUserStreamActive=false;
+				device->m_UserTrackerFrame.release();
 				device->m_pUserTracker->destroy();
 				device->m_pUserTracker=nullptr;
 				std::cout << "OpenNI: Couldn't create UserStream\n" << std::endl;
 			}
-			else
-			{
-				m_bIsUserTrackerRunning=true;
-			}
-		}
-		else 
-		{
-			m_bIsUserTrackerRunning=false;
-			device->m_pUserTracker = nullptr;
-			device->m_bUserStreamActive=false;
 		}
 	}
 	
@@ -340,14 +328,15 @@ bool OpenNI2xWrapper::shutdown()
 	
 	std::cout << "OpenNI: Shutdown" << std::endl;
 
+	for(uint16_t i=0; i<m_Devices.size(); i++)
+		stopDevice(i);
+	m_Devices.clear();
 
 	nite::NiTE::shutdown();
 	openni::OpenNI::shutdown();
 	
-	/*for(uint16_t i=0; i<m_Devices.size(); i++)
-		stopDevice(i);
-
-	m_Devices.clear();*/
+	
+	
 
 	return true;
 }
@@ -393,7 +382,7 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 
 	
 	// user tracking / skeleton tracking
-	if(m_bIsUserTrackerRunning && m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
+	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
 	{
 		nite::Status niteRc = m_Devices[iDeviceNumber]->m_pUserTracker->readFrame(&m_Devices[iDeviceNumber]->m_UserTrackerFrame);
 		m_Devices[iDeviceNumber]->m_DepthFrame = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getDepthFrame();
@@ -452,7 +441,7 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 
 	// subtract background if needed
 	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
-		if(m_Devices[iDeviceNumber]->m_bSubtractBackground && m_Devices[iDeviceNumber]->m_UserCount>0)
+		if(m_Devices[iDeviceNumber]->m_bSubtractBackground && isOneUserVisible(iDeviceNumber))
 		{
 			for(int y=0;y<m_Devices[iDeviceNumber]->m_DepthFrame.getHeight();y++)
 				for(int x=0;x<m_Devices[iDeviceNumber]->m_DepthFrame.getWidth();x++)
@@ -545,6 +534,8 @@ void OpenNI2xWrapper::printUserState(uint16_t iDeviceNumber, const nite::UserDat
 
 bool OpenNI2xWrapper::startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed)
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	if(iDeviceNumber < m_Devices.size() && m_Recorder.create(fileName.c_str()) == openni::STATUS_OK)
 	{
 		if(m_Devices[iDeviceNumber]->m_bRGBStreamActive)
@@ -570,6 +561,8 @@ bool OpenNI2xWrapper::startRecording(uint16_t iDeviceNumber, std::string fileNam
 
 void OpenNI2xWrapper::stopRecording()
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	std::cout << "OpenNI: Stop recording" << std::endl;
 	m_Recorder.stop();
 	m_Recorder.destroy();
@@ -577,6 +570,8 @@ void OpenNI2xWrapper::stopRecording()
 
 int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device index
 {
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
 	std::shared_ptr<OpenNIDevice> recorderDevice(new OpenNIDevice());
 
 	if(recorderDevice->m_Device.open((fileName).c_str()) != openni::STATUS_OK)
@@ -607,6 +602,8 @@ void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
 {
 	if(iRecordId>=m_Devices.size())
 		return;
+
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
 	stopDevice(iRecordId);
 	m_Devices.erase(m_Devices.begin()+iRecordId);

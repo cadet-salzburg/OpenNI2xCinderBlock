@@ -64,6 +64,7 @@ Known Issues
 	
 	* When using multiple devices, usertracker just works for the first device 
 		(tested with KINECT SDK and NITE2 for live and playback devices, should behave the same when using two real devices)
+		This is working now for multiple devices and recordings tested with two primesense devices, not sure about kinect yet
 	
 	* When the UserTracker is enabled you can't mirror the DepthStream
 
@@ -71,10 +72,11 @@ Known Issues
 
 	* You can't play the same file with different positions, if you start the same file twice the always run synchronously 
 
+	* Same file playback with usertracker and subtraction flickers 
+
 TODO
 ----
-* user tracker crashes on close
-* Auto Restart still problems to fix (user tracker is not restarted)
+* Auto Restart crashed due to an bug in the close function of openni
 * Alternative event based implementation (should be way faster as it's threaded,specially for multiple devices)
 * HandTracker
 * device number vs. uri, rewrite functions to work with unique ids
