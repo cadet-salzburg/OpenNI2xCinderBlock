@@ -35,6 +35,8 @@
 
 
 #define MAX_USERS 10
+#define DEFAULT_WIDTH 640
+#define DEFAULT_HEIGHT 480
 
 class OpenNIDevice
 {
@@ -174,6 +176,9 @@ public:
 	uint16_t		getDepthHeight(uint16_t iDeviceNumber);
 	uint16_t		getUserWidth(uint16_t iDeviceNumber);
 	uint16_t		getUserHeight(uint16_t iDeviceNumber);
+	bool			setRgbResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h);
+	bool			setDepthResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h);
+	bool			setIrResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h);
 
 	uint16_t*		getDepth16BitImgPtr(uint16_t iDeviceNumber);
 	uint8_t*		getDepth8BitImgPtr(uint16_t iDeviceNumber);
@@ -197,6 +202,7 @@ private:
 
 	bool startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream);
 	void printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts);
+	void convertToCinder(std::shared_ptr<OpenNIDevice> device);
 
 	// overwrite for baseclass of openni for device connection callbacks
 	void onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state);
