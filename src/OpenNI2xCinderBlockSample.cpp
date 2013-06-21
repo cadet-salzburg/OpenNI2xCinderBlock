@@ -26,6 +26,7 @@ class OpenNI2xCinderBlockSample : public AppBasic {
 	void record();
 	void play();
 	void stop();
+	void pause();
 
 	OpenNI2xWrapper&		m_OpenNI2xBlock;
 	params::InterfaceGlRef	m_Params;
@@ -33,6 +34,7 @@ class OpenNI2xCinderBlockSample : public AppBasic {
 	bool					m_bAlign;
 	bool					m_bSubtractBg;
 	bool					m_bIsRecording;
+	bool					m_bIsPlaying;
 	std::vector<int>		m_vPlaybackIDs;	
 	int						m_iRecording;
 			
@@ -55,6 +57,7 @@ void OpenNI2xCinderBlockSample::setup()
 	m_bSubtractBg=false;
 	m_bIsRecording=false;
 	m_iRecording=0;
+	m_bIsPlaying=false;
 
 	// Setup the parameters
 	m_Params = params::InterfaceGl::create( getWindow(), "OpenNI parameters", toPixels( Vec2i( 200, 400 ) ) );
@@ -65,6 +68,7 @@ void OpenNI2xCinderBlockSample::setup()
 	m_Params->addButton( "Start/Stop Record", std::bind( &OpenNI2xCinderBlockSample::record, this ) );
 	m_Params->addButton( "Play", std::bind( &OpenNI2xCinderBlockSample::play, this ) );
 	m_Params->addButton( "Stop", std::bind( &OpenNI2xCinderBlockSample::stop, this ) );
+	m_Params->addButton( "Pause", std::bind( &OpenNI2xCinderBlockSample::pause, this ) );
 }
 
 void OpenNI2xCinderBlockSample::shutdown()
@@ -162,7 +166,7 @@ void OpenNI2xCinderBlockSample::record()
 	 {
 		std::stringstream fileName;
 		fileName << "capture" << m_iRecording-1 << ".oni";
-		m_vPlaybackIDs.push_back(m_OpenNI2xBlock.startPlayback(fileName.str(), false));
+		m_vPlaybackIDs.push_back(m_OpenNI2xBlock.startPlayback(fileName.str(), true));
 	 }
  }
 
@@ -172,6 +176,22 @@ void OpenNI2xCinderBlockSample::record()
 	 {
 		 m_OpenNI2xBlock.stopPlayback(m_vPlaybackIDs.back());
 		 m_vPlaybackIDs.pop_back();
+	 }
+ }
+
+ void OpenNI2xCinderBlockSample::pause()
+ {
+	 if(m_vPlaybackIDs.size()>0)
+	 {
+		  m_bIsPlaying = !m_bIsPlaying;
+		 if(m_bIsPlaying)
+		 {
+			m_OpenNI2xBlock.pauseDevice(m_vPlaybackIDs.back());
+		 }
+		 else
+		 {
+			 m_OpenNI2xBlock.resumeDevice(m_vPlaybackIDs.back());
+		 }
 	 }
  }
 
