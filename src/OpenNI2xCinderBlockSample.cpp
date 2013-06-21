@@ -46,7 +46,7 @@ void OpenNI2xCinderBlockSample::prepareSettings( Settings *settings )
 
 void OpenNI2xCinderBlockSample::setup()
 {
-	m_OpenNI2xBlock.init(false);
+	m_OpenNI2xBlock.init();
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)
 		m_OpenNI2xBlock.startDevice(i);
 	
