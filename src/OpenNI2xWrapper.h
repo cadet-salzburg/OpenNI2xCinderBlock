@@ -165,6 +165,9 @@ public:
 	void			stopPlayback(uint16_t iRecordId);
 	void			pausePlayback(uint16_t iRecordId);
 	void			resumePlayback(uint16_t iRecordId);
+	void			setPlaybackSpeed(uint16_t iRecordId, float speed);
+	void			setPlaybackPosition(uint16_t iRecordId, float pos);
+	unsigned long	getPlaybackNumberOfFrames(uint16_t iRecordId);		
 
 	void			setDepthColorImageAlignment(uint16_t iDeviceNumber, bool bEnabled);
 	void			setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnabled);

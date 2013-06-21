@@ -284,6 +284,33 @@ void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
 	resumeDevice(iRecordId);
 }
 
+void OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
+{
+}
+
+void OpenNI2xWrapper::setPlaybackPosition(uint16_t iRecordId, float pos)
+{
+	//if(iRecordId>=m_Devices.size())
+	//	return;
+	//std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	//if(m_Devices[iRecordId]->m_Device.isFile())
+	//{
+	//	m_Devices[iRecordId]->m_Player->seek();
+	//}
+}
+
+unsigned long OpenNI2xWrapper::getPlaybackNumberOfFrames(uint16_t iRecordId)
+{
+	//if(iRecordId>=m_Devices.size())
+	//	return 0;
+	//std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	//if(m_Devices[iRecordId]->m_Device.isFile())
+	//{
+	//	return m_Devices[iRecordId]->m_Player->getNumberOfFrames()
+	//}
+	return 0;
+}
+
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
