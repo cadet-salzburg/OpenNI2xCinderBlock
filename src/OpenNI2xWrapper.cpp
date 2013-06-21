@@ -216,6 +216,13 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 {
+	if(iDeviceNumber>=m_Devices.size())
+		return;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iDeviceNumber]->m_Device.isFile())
+	{
+		m_Devices[iDeviceNumber]->m_Player->setSpeed(-1);	
+	}
 	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
 	{
 		m_Devices[iDeviceNumber]->m_DepthStream.stop();
@@ -234,6 +241,7 @@ void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::resumeDevice(uint16_t iDeviceNumber)
 {
+	
 	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
 	{
 		m_Devices[iDeviceNumber]->m_DepthStream.start();
@@ -248,6 +256,32 @@ void OpenNI2xWrapper::resumeDevice(uint16_t iDeviceNumber)
 	}
 
 	m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+}
+
+void OpenNI2xWrapper::pausePlayback(uint16_t iRecordId)
+{
+	if(iRecordId>=m_Devices.size())
+		return;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		m_Devices[iRecordId]->m_Player->setSpeed(-1);
+	}
+	pauseDevice(iRecordId);
+}
+
+void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
+{
+	if(iRecordId>=m_Devices.size())
+		return;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		m_Devices[iRecordId]->m_Player->setSpeed(1);
+	}
+	resumeDevice(iRecordId);
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)

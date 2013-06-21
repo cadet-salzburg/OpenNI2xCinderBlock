@@ -163,7 +163,9 @@ public:
 	void			stopRecording();
 	int16_t			startPlayback(std::string fileName, bool bLoop);
 	void			stopPlayback(uint16_t iRecordId);
-	
+	void			pausePlayback(uint16_t iRecordId);
+	void			resumePlayback(uint16_t iRecordId);
+
 	void			setDepthColorImageAlignment(uint16_t iDeviceNumber, bool bEnabled);
 	void			setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnabled);
 	void			setBackgroundSubtraction(uint16_t iDeviceNumber, bool bEnabled);

@@ -186,11 +186,11 @@ void OpenNI2xCinderBlockSample::record()
 		  m_bIsPlaying = !m_bIsPlaying;
 		 if(m_bIsPlaying)
 		 {
-			m_OpenNI2xBlock.pauseDevice(m_vPlaybackIDs.back());
+			m_OpenNI2xBlock.pausePlayback(m_vPlaybackIDs.back());
 		 }
 		 else
 		 {
-			 m_OpenNI2xBlock.resumeDevice(m_vPlaybackIDs.back());
+			 m_OpenNI2xBlock.resumePlayback(m_vPlaybackIDs.back());
 		 }
 	 }
  }
