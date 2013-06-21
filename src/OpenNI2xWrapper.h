@@ -55,6 +55,13 @@ class OpenNIDevice
 			m_bDepthStreamActive = false;
 			m_bUserStreamActive = false;
 			m_bSubtractBackground = false;
+			m_IRTexture = ci::gl::Texture();
+			m_RGBTexture = ci::gl::Texture();
+			m_Depth16BitTexture = ci::gl::Texture();
+			m_Depth8BitTexture = ci::gl::Texture();
+			m_DepthDiffHistogramTexture = ci::gl::Texture();
+			m_UserTexture = ci::gl::Texture();
+			m_DepthDiffTexture = ci::gl::Texture();
 		};
 
 		openni::Device								m_Device;

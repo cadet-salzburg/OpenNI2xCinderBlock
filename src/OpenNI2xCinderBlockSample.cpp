@@ -146,7 +146,7 @@ void OpenNI2xCinderBlockSample::record()
 	{
 		std::stringstream fileName;
 		fileName << "capture" << m_iRecording << ".oni";
-		m_OpenNI2xBlock.startRecording(0, fileName.str(), true);
+		m_OpenNI2xBlock.startRecording(0, fileName.str(), false);
 		m_iRecording++;
 	}
 	else

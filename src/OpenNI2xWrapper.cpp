@@ -211,57 +211,8 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	std::shared_ptr<OpenNIDevice> device = m_Devices[iDeviceNumber];
 	device->m_pStreams = new openni::VideoStream*[2];
 
-	
-		
-	if(bHasRGBStream)
-	{
-		if(device->m_RGBStream.create(device->m_Device, openni::SENSOR_COLOR) == openni::STATUS_OK)
-		{
-			setRgbResolution(iDeviceNumber, DEFAULT_WIDTH, DEFAULT_HEIGHT);		// this starts the stream
-			openni::VideoMode colorVideoMode = device->m_RGBStream.getVideoMode();
-			device->m_iRgbImgWidth = colorVideoMode.getResolutionX();
-			device->m_iRgbImgHeight = colorVideoMode.getResolutionY();
-			device->m_pStreams[streamCount++] = &device->m_RGBStream;
-		}
-		else
-		{
-			device->m_bRGBStreamActive=false;
-			std::cout << "OpenNI: Couldn't start color stream: " << openni::OpenNI::getExtendedError() << std::endl;
-		}
-	}
-	if(bHasDepthStream)
-	{
-		if(device->m_DepthStream.create(device->m_Device, openni::SENSOR_DEPTH) == openni::STATUS_OK )
-		{
-			setDepthResolution(iDeviceNumber,  DEFAULT_WIDTH, DEFAULT_HEIGHT); // this starts the stream
-			openni::VideoMode depthVideoMode = device->m_DepthStream.getVideoMode();
-			device->m_iDepthImgWidth = depthVideoMode.getResolutionX();
-			device->m_iDepthImgHeight = depthVideoMode.getResolutionY();
-			device->m_pStreams[streamCount++] = &device->m_DepthStream;
-		}
-		else
-		{
-			device->m_bDepthStreamActive=false;
-			std::cout << "OpenNI: Couldn't start depth stream: " << openni::OpenNI::getExtendedError() << std::endl;
-		}
-	}
-	if(hasIRStream)
-	{
-		if(device->m_IRStream.create(device->m_Device, openni::SENSOR_IR) == openni::STATUS_OK && device->m_IRStream.start() == openni::STATUS_OK)
-		{
-			openni::VideoMode irVideoMode = device->m_IRStream.getVideoMode();
-			device->m_iIRImgWidth = irVideoMode.getResolutionX();
-			device->m_iIRImgHeight = irVideoMode.getResolutionY();
-			device->m_pStreams[streamCount++] = &device->m_IRStream;
-		}
-		else
-		{
-			device->m_bIRStreamActive=false;
-			std::cout << "OpenNI: Couldn't start ir stream: " << openni::OpenNI::getExtendedError() << std::endl;
-		}
-	}
 
-	if(m_bUserTrackingInitizialized && bHasUserTracker)
+	if(m_bUserTrackingInitizialized && bHasUserTracker)	// whyever this has to be initialized first otherwise it crashes
 	{
 		if( device->m_pUserTracker==nullptr)
 		{
@@ -278,7 +229,59 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			}
 		}
 	}
+	if(bHasDepthStream)
+	{
+		if(device->m_DepthStream.create(device->m_Device, openni::SENSOR_DEPTH) == openni::STATUS_OK )
+		{
+			setDepthResolution(iDeviceNumber,  DEFAULT_WIDTH, DEFAULT_HEIGHT); 
+			device->m_DepthStream.start();
+			openni::VideoMode depthVideoMode = device->m_DepthStream.getVideoMode();
+			device->m_iDepthImgWidth = depthVideoMode.getResolutionX();
+			device->m_iDepthImgHeight = depthVideoMode.getResolutionY();
+			device->m_pStreams[streamCount++] = &device->m_DepthStream;
+		}
+		else
+		{
+			device->m_bDepthStreamActive=false;
+			std::cout << "OpenNI: Couldn't start depth stream: " << openni::OpenNI::getExtendedError() << std::endl;
+		}
+	}		
+	if(bHasRGBStream)
+	{
+		if(device->m_RGBStream.create(device->m_Device, openni::SENSOR_COLOR) == openni::STATUS_OK)
+		{
+			setRgbResolution(iDeviceNumber, DEFAULT_WIDTH, DEFAULT_HEIGHT);		
+			device->m_RGBStream.start();
+			openni::VideoMode colorVideoMode = device->m_RGBStream.getVideoMode();
+			device->m_iRgbImgWidth = colorVideoMode.getResolutionX();
+			device->m_iRgbImgHeight = colorVideoMode.getResolutionY();
+			device->m_pStreams[streamCount++] = &device->m_RGBStream;
+		}
+		else
+		{
+			device->m_bRGBStreamActive=false;
+			std::cout << "OpenNI: Couldn't start color stream: " << openni::OpenNI::getExtendedError() << std::endl;
+		}
+	}
+	if(hasIRStream)
+	{
+		if(device->m_IRStream.create(device->m_Device, openni::SENSOR_IR) == openni::STATUS_OK && device->m_IRStream.start() == openni::STATUS_OK)
+		{
+			setIrResolution(iDeviceNumber,  DEFAULT_WIDTH, DEFAULT_HEIGHT); 
+			device->m_IRStream.start();
+			openni::VideoMode irVideoMode = device->m_IRStream.getVideoMode();
+			device->m_iIRImgWidth = irVideoMode.getResolutionX();
+			device->m_iIRImgHeight = irVideoMode.getResolutionY();
+			device->m_pStreams[streamCount++] = &device->m_IRStream;
+		}
+		else
+		{
+			device->m_bIRStreamActive=false;
+			std::cout << "OpenNI: Couldn't start ir stream: " << openni::OpenNI::getExtendedError() << std::endl;
+		}
+	}
 
+	
 	setDepthColorImageAlignment(iDeviceNumber, true);
 	setBackgroundSubtraction(iDeviceNumber, false);
 
@@ -597,7 +600,7 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device i
 	
 	recorderDevice->m_bRGBStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_COLOR);
 	recorderDevice->m_bDepthStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_DEPTH);
-	recorderDevice->m_bUserStreamActive = recorderDevice->m_bDepthStreamActive;
+	recorderDevice->m_bUserStreamActive = recorderDevice->m_bDepthStreamActive && m_bUserTrackingInitizialized;
 	recorderDevice->m_bIRStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_IR);
 
 	m_Devices.push_back(recorderDevice);	// push in list of all running devices
@@ -767,7 +770,9 @@ bool OpenNI2xWrapper::setRgbResolution(uint16_t iDeviceNumber, uint16_t w, uint1
 		return false;
 	}
 	
-	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);
+	if(m_Devices[iDeviceNumber]->m_Device.isFile())
+		return false;
 	m_Devices[iDeviceNumber]->m_RGBStream.stop();
 	openni::VideoMode mode;
 	mode.setFps(30);
@@ -791,6 +796,8 @@ bool OpenNI2xWrapper::setIrResolution(uint16_t iDeviceNumber, uint16_t w, uint16
 	}
 
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+	if(m_Devices[iDeviceNumber]->m_Device.isFile())
+		return false;
 	m_Devices[iDeviceNumber]->m_IRStream.stop();
 	openni::VideoMode mode;
 	mode.setFps(30);
@@ -814,6 +821,8 @@ bool OpenNI2xWrapper::setDepthResolution(uint16_t iDeviceNumber, uint16_t w, uin
 	}
 
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+	if(m_Devices[iDeviceNumber]->m_Device.isFile())
+		return false;
 	m_Devices[iDeviceNumber]->m_DepthStream.stop();
 	openni::VideoMode mode;
 	mode.setFps(30);
