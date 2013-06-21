@@ -62,6 +62,7 @@ class OpenNIDevice
 			m_DepthDiffHistogramTexture = ci::gl::Texture();
 			m_UserTexture = ci::gl::Texture();
 			m_DepthDiffTexture = ci::gl::Texture();
+			m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
 		};
 
 		openni::Device								m_Device;
@@ -78,7 +79,8 @@ class OpenNIDevice
 		uint64_t									m_poseTime;
 		uint16_t									m_UserCount;
 		openni::PlaybackControl*					m_Player;
-		bool										m_bIsRunning;
+		openni::DeviceState							m_iDeviceState;
+		bool										m_bIsDeviceActive;
 		std::string									m_Uri;
 
 		bool					m_bVisibleUsers[MAX_USERS];
@@ -147,16 +149,19 @@ public:
 	int16_t			startDevice(uint16_t iDeviceNumber, bool bHasRGBStream=true, bool bHasDepthStream=true, bool bHasUserTracker=true, bool bHasIRStream=false);
 	void			stopDevice(std::string uri);
 	void			stopDevice(uint16_t iDeviceNumber);
+	void			pauseDevice(uint16_t iDeviceNumber);
+	void			resumeDevice(uint16_t iDeviceNumber);
 	void			updateDevice(uint16_t iDeviceNumber);
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getDevicesConnected();
 	int16_t			getRegisteredDeviceNumberForURI(std::string uri);
 	uint16_t		getDevicesInitialized();
+	bool			isDeviceActive(uint16_t iDeviceNumber);
 	bool			isDeviceRunning(uint16_t iDeviceNumber);
 	
 	bool			startRecording(uint16_t iDeviceNumber, std::string fileName, bool isLossyCompressed=false);
 	void			stopRecording();
-	int16_t			startPlayback(std::string fileName);
+	int16_t			startPlayback(std::string fileName, bool bLoop);
 	void			stopPlayback(uint16_t iRecordId);
 	
 	void			setDepthColorImageAlignment(uint16_t iDeviceNumber, bool bEnabled);

@@ -46,7 +46,7 @@ void OpenNI2xCinderBlockSample::prepareSettings( Settings *settings )
 
 void OpenNI2xCinderBlockSample::setup()
 {
-	m_OpenNI2xBlock.init();
+	m_OpenNI2xBlock.init(true);
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesConnected(); i++)
 		m_OpenNI2xBlock.startDevice(i);
 	
@@ -87,7 +87,7 @@ void OpenNI2xCinderBlockSample::draw()
 
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		if(m_OpenNI2xBlock.isDeviceActive(i))
 		{
 			m_OpenNI2xBlock.updateDevice(i);
 			m_OpenNI2xBlock.debugDraw(i);
@@ -105,7 +105,7 @@ void OpenNI2xCinderBlockSample::setMirrored()
 	m_bMirrored=!m_bMirrored;
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		if(m_OpenNI2xBlock.isDeviceActive(i))
 			m_OpenNI2xBlock.setAllStreamsMirrored(i, m_bMirrored);
 	}
 
@@ -115,7 +115,7 @@ void OpenNI2xCinderBlockSample::resetStreams()
 {
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		if(m_OpenNI2xBlock.isDeviceActive(i))
 			m_OpenNI2xBlock.resetDevice(i);
 	}
 }
@@ -125,7 +125,7 @@ void OpenNI2xCinderBlockSample::alignDepthRGB()
 	m_bAlign=!m_bAlign;
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		if(m_OpenNI2xBlock.isDeviceActive(i))
 			m_OpenNI2xBlock.setDepthColorImageAlignment(i, m_bAlign);
 	}
 }
@@ -135,7 +135,7 @@ void OpenNI2xCinderBlockSample::subtractBg()
 	m_bSubtractBg=!m_bSubtractBg;
 	for(int i=0; i<m_OpenNI2xBlock.getDevicesInitialized(); i++)
 	{
-		if(m_OpenNI2xBlock.isDeviceRunning(i))
+		if(m_OpenNI2xBlock.isDeviceActive(i))
 			m_OpenNI2xBlock.setBackgroundSubtraction(i, m_bSubtractBg);
 	}
 }
@@ -162,7 +162,7 @@ void OpenNI2xCinderBlockSample::record()
 	 {
 		std::stringstream fileName;
 		fileName << "capture" << m_iRecording-1 << ".oni";
-		m_vPlaybackIDs.push_back(m_OpenNI2xBlock.startPlayback(fileName.str()));
+		m_vPlaybackIDs.push_back(m_OpenNI2xBlock.startPlayback(fileName.str(), false));
 	 }
  }
 

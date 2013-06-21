@@ -24,8 +24,15 @@ OpenNI2xWrapper& OpenNI2xWrapper::getInstance()
 
 void OpenNI2xWrapper::onDeviceStateChanged(const openni::DeviceInfo* pInfo, openni::DeviceState state) 
 {
-	printf("Device \"%s\" error state changed to %d\n", pInfo->getUri(), state);
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+	printf("Device \"%s\" device state changed to %d\n", pInfo->getUri(), state);
+	int16_t deviceNr = getRegisteredDeviceNumberForURI(pInfo->getUri());
+	if(deviceNr<0 || deviceNr>=(int16_t)m_Devices.size())
+		return;
+	if(state == openni::DeviceState::DEVICE_STATE_EOF)
+		m_Devices[deviceNr]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
 }
+
 
 void OpenNI2xWrapper::onDeviceConnected(const openni::DeviceInfo* pInfo)
 {
@@ -144,7 +151,10 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 	}
 
 	if(startStreams( iDeviceNumber, device->m_bRGBStreamActive, device->m_bDepthStreamActive, device->m_bUserStreamActive, device->m_bIRStreamActive))
+	{
+		m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
 		return iDeviceID;
+	}
 	else
 		return -1;
 }
@@ -168,7 +178,7 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	
-	m_Devices[iDeviceNumber]->m_bIsRunning=false;
+	m_Devices[iDeviceNumber]->m_bIsDeviceActive=false;
 	// not sure if I have to care for cleanup of the streams running, as they are part of the device
 	if(m_Devices[iDeviceNumber]->m_pUserTracker != nullptr)
 	{
@@ -194,6 +204,7 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 	}
 		
 	m_Devices[iDeviceNumber]->m_Device.close();
+	m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
 	//
 	//// cleanup memory
 	if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr != nullptr)
@@ -201,6 +212,42 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 		delete m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr;
 		m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr = nullptr;
 	}
+}
+
+void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
+{
+	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
+	{
+		m_Devices[iDeviceNumber]->m_DepthStream.stop();
+	}
+	if (m_Devices[iDeviceNumber]->m_RGBStream.isValid())
+	{
+		m_Devices[iDeviceNumber]->m_RGBStream.stop();	
+	}
+	if (m_Devices[iDeviceNumber]->m_IRStream.isValid())
+	{
+		m_Devices[iDeviceNumber]->m_IRStream.stop();
+	}
+
+	m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
+}
+
+void OpenNI2xWrapper::resumeDevice(uint16_t iDeviceNumber)
+{
+	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
+	{
+		m_Devices[iDeviceNumber]->m_DepthStream.start();
+	}
+	if (m_Devices[iDeviceNumber]->m_RGBStream.isValid())
+	{
+		m_Devices[iDeviceNumber]->m_RGBStream.start();	
+	}
+	if (m_Devices[iDeviceNumber]->m_IRStream.isValid())
+	{
+		m_Devices[iDeviceNumber]->m_IRStream.start();
+	}
+
+	m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
 }
 
 bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool hasIRStream)
@@ -288,7 +335,7 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	// freezes the app
 	//setDepthColorSync(iDeviceNumber, true);
 	
-	device->m_bIsRunning=true;
+	device->m_bIsDeviceActive=true;
 	return true;
 }
 
@@ -316,6 +363,18 @@ uint16_t OpenNI2xWrapper::getDevicesInitialized()
 	return m_Devices.size();
 }
 
+bool OpenNI2xWrapper::isDeviceActive(uint16_t iDeviceNumber)
+{
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
+
+	if(iDeviceNumber>=m_Devices.size())
+	{
+		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
+		return false;
+	}
+	return m_Devices[iDeviceNumber]->m_bIsDeviceActive;
+}
+
 bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
@@ -325,7 +384,13 @@ bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
 		return false;
 	}
-	return m_Devices[iDeviceNumber]->m_bIsRunning;
+
+	
+	if(m_Devices[iDeviceNumber]->m_bIsDeviceActive && m_Devices[iDeviceNumber]->m_iDeviceState != openni::DeviceState::DEVICE_STATE_NOT_READY)
+		return true;
+	else
+		return false;
+	
 }
 
 bool OpenNI2xWrapper::shutdown()
@@ -368,7 +433,7 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 	
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber>=m_Devices.size() || !m_Devices[iDeviceNumber]->m_bIsRunning)
+	if(iDeviceNumber>=m_Devices.size() || !m_Devices[iDeviceNumber]->m_bIsDeviceActive)
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -581,7 +646,7 @@ void OpenNI2xWrapper::stopRecording()
 	m_Recorder.destroy();
 }
 
-int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device index
+int16_t OpenNI2xWrapper::startPlayback(std::string fileName, bool bLoop)		// return device index
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
@@ -596,15 +661,14 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName)		// return device i
 	recorderDevice->m_Player = recorderDevice->m_Device.getPlaybackControl();
 	if(!recorderDevice->m_Player->isValid())
 		-1;
-	recorderDevice->m_Player->setRepeatEnabled(true);
-	
+	recorderDevice->m_Player->setRepeatEnabled(bLoop);
 	recorderDevice->m_bRGBStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_COLOR);
 	recorderDevice->m_bDepthStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_DEPTH);
 	recorderDevice->m_bUserStreamActive = recorderDevice->m_bDepthStreamActive && m_bUserTrackingInitizialized;
 	recorderDevice->m_bIRStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_IR);
-
+	recorderDevice->m_Uri = fileName;
 	m_Devices.push_back(recorderDevice);	// push in list of all running devices
-
+	
 	std::cout << "OpenNI: Start playback " << fileName << std::endl;
 	startStreams(m_Devices.size()-1, recorderDevice->m_bRGBStreamActive, recorderDevice->m_bDepthStreamActive, recorderDevice->m_bUserStreamActive, recorderDevice->m_bIRStreamActive);
 	
