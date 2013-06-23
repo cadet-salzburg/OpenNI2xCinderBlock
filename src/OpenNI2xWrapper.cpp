@@ -284,30 +284,92 @@ void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
 	resumeDevice(iRecordId);
 }
 
-void OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
+bool OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
 {
+	if(iRecordId>=m_Devices.size())
+		return false;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(speed==0.0)
+		speed=-1.0;
+	if(	m_Devices[iRecordId]->m_Player->setSpeed(speed) == openni::STATUS_OK)
+		return true;
+	return false;
 }
 
-void OpenNI2xWrapper::setPlaybackPosition(uint16_t iRecordId, float pos)
+bool OpenNI2xWrapper::setPlaybackRgbFrameNumber(uint16_t iRecordId, unsigned long frame)
 {
-	//if(iRecordId>=m_Devices.size())
-	//	return;
-	//std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
-	//if(m_Devices[iRecordId]->m_Device.isFile())
-	//{
-	//	m_Devices[iRecordId]->m_Player->seek();
-	//}
+	if(iRecordId>=m_Devices.size())
+		return false;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		if(m_Devices[iRecordId]->m_Player->seek(m_Devices[iRecordId]->m_RGBStream, frame)==openni::STATUS_OK)
+			return true;
+	}
+	return false;
+}
+	
+bool OpenNI2xWrapper::setPlaybackIrFrameNumber(uint16_t iRecordId, unsigned long frame)
+{
+	if(iRecordId>=m_Devices.size())
+		return false;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		if(m_Devices[iRecordId]->m_Player->seek(m_Devices[iRecordId]->m_IRStream, frame)==openni::STATUS_OK)
+			return true;
+	}
+	return false;
 }
 
-unsigned long OpenNI2xWrapper::getPlaybackNumberOfFrames(uint16_t iRecordId)
+bool OpenNI2xWrapper::setPlaybackDepthFrameNumber(uint16_t iRecordId, unsigned long frame)
 {
-	//if(iRecordId>=m_Devices.size())
-	//	return 0;
-	//std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
-	//if(m_Devices[iRecordId]->m_Device.isFile())
-	//{
-	//	return m_Devices[iRecordId]->m_Player->getNumberOfFrames()
-	//}
+	if(iRecordId>=m_Devices.size())
+		return false;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		if(m_Devices[iRecordId]->m_Player->seek(m_Devices[iRecordId]->m_DepthStream, frame)==openni::STATUS_OK)
+			return true;
+	}
+	return false;
+}
+
+
+
+unsigned long OpenNI2xWrapper::getPlaybackNumberOfRgbFrames(uint16_t iRecordId)
+{
+	if(iRecordId>=m_Devices.size())
+		return 0;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		return m_Devices[iRecordId]->m_Player->getNumberOfFrames(m_Devices[iRecordId]->m_RGBStream);
+	}
+	return 0;
+}
+
+unsigned long OpenNI2xWrapper::getPlaybackNumberOfIrFrames(uint16_t iRecordId)
+{
+	if(iRecordId>=m_Devices.size())
+		return 0;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		return m_Devices[iRecordId]->m_Player->getNumberOfFrames(m_Devices[iRecordId]->m_IRStream);
+	}
+	return 0;
+}
+
+unsigned long OpenNI2xWrapper::getPlaybackNumberOfDepthFrames(uint16_t iRecordId)
+{
+	if(iRecordId>=m_Devices.size())
+		return 0;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
+	if(m_Devices[iRecordId]->m_Device.isFile())
+	{
+		return m_Devices[iRecordId]->m_Player->getNumberOfFrames(m_Devices[iRecordId]->m_DepthStream);
+	}
 	return 0;
 }
 
