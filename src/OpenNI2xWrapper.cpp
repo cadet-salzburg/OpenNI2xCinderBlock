@@ -284,6 +284,11 @@ void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
 	resumeDevice(iRecordId);
 }
 
+bool OpenNI2xWrapper::isPlaybackRunning(uint16_t iRecordId)
+{
+	return isDeviceRunning(iRecordId);
+}
+
 bool OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
 {
 	if(iRecordId>=m_Devices.size())
@@ -291,6 +296,8 @@ bool OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(speed==0.0)
 		speed=-1.0;
+	if(speed==-1.0)
+		speed=0.0;
 	if(	m_Devices[iRecordId]->m_Player->setSpeed(speed) == openni::STATUS_OK)
 		return true;
 	return false;
@@ -550,7 +557,7 @@ bool OpenNI2xWrapper::resetDevice(uint16_t iDeviceNumber)
 	return true;
 }
 
-void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
+void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber, bool bMakeTextures)
 {
 	int streamReady=-1;
 	
@@ -657,7 +664,8 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber)
 					}
 		}
 
-	convertToCinder(m_Devices[iDeviceNumber]);
+	if(bMakeTextures)
+		convertToCinder(m_Devices[iDeviceNumber]);
 }
 
 void OpenNI2xWrapper::convertToCinder(shared_ptr<OpenNIDevice> device)
@@ -851,8 +859,6 @@ void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnable
 
 	if(m_Devices[iDeviceNumber]->m_RGBStream.setMirroringEnabled(bEnabled)!=openni::STATUS_OK)
 		printf("OpenNI: Couldn't mirror RGB Stream\n");
-
-
 	if(m_Devices[iDeviceNumber]->m_DepthStream.setMirroringEnabled(bEnabled)!=openni::STATUS_OK)
 		printf("OpenNI: Couldn't mirror Depth Stream\n");
 	if(m_Devices[iDeviceNumber]->m_IRStream.setMirroringEnabled(bEnabled)!=openni::STATUS_OK)

@@ -151,7 +151,7 @@ public:
 	void			stopDevice(uint16_t iDeviceNumber);
 	void			pauseDevice(uint16_t iDeviceNumber);
 	void			resumeDevice(uint16_t iDeviceNumber);
-	void			updateDevice(uint16_t iDeviceNumber);
+	void			updateDevice(uint16_t iDeviceNumber, bool makeTextures=true);
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getDevicesConnected();
 	int16_t			getRegisteredDeviceNumberForURI(std::string uri);
@@ -165,6 +165,7 @@ public:
 	void			stopPlayback(uint16_t iRecordId);
 	void			pausePlayback(uint16_t iRecordId);
 	void			resumePlayback(uint16_t iRecordId);
+	bool			isPlaybackRunning(uint16_t iRecordId);
 	bool			setPlaybackSpeed(uint16_t iRecordId, float speed);
 	bool			setPlaybackRgbFrameNumber(uint16_t iRecordId, unsigned long frame);
 	bool			setPlaybackIrFrameNumber(uint16_t iRecordId, unsigned long frame);
