@@ -27,7 +27,7 @@ void OpenNI2xWrapper::onDeviceStateChanged(const openni::DeviceInfo* pInfo, open
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 	printf("Device \"%s\" device state changed to %d\n", pInfo->getUri(), state);
 	int16_t deviceNr = getRegisteredDeviceNumberForURI(pInfo->getUri());
-	if(deviceNr<0 || deviceNr>=(int16_t)m_Devices.size())
+	if(deviceNr<0)
 		return;
 	if(state == openni::DeviceState::DEVICE_STATE_EOF)
 		m_Devices[deviceNr]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
@@ -68,7 +68,6 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 		return false;
 	}
 		
-
 	m_bUserTrackingInitizialized=false;
 	
 	if(bUseUserTracking)
@@ -107,9 +106,9 @@ int16_t OpenNI2xWrapper::startDevice(string uri, bool bHasRGBStream, bool bHasDe
 
 int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream, bool bHasDepthStream, bool bHasUserTracker, bool bHasIRStream)
 {
-	int iDeviceID=-1;
 	openni::Status rc = openni::STATUS_OK;
 	nite::Status niterc = nite::STATUS_OK;
+	int16_t deviceID=-1;
 
 	if(iDeviceNumber>=m_DeviceInfoList.getSize())
 	{
@@ -147,13 +146,14 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 		device->m_bDepthStreamActive = bHasDepthStream;
 		device->m_bUserStreamActive = bHasUserTracker && m_bUserTrackingInitizialized;
 		device->m_bIRStreamActive = bHasIRStream;
-		m_Devices.push_back(device);	// push in list of all running devices
+		deviceID = m_Devices.size();
+		m_Devices[deviceID] = device;	// push in list of all running devices
 	}
 
-	if(startStreams( iDeviceNumber, device->m_bRGBStreamActive, device->m_bDepthStreamActive, device->m_bUserStreamActive, device->m_bIRStreamActive))
+	if(startStreams( deviceID, device->m_bRGBStreamActive, device->m_bDepthStreamActive, device->m_bUserStreamActive, device->m_bIRStreamActive))
 	{
-		m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
-		return iDeviceID;
+		m_Devices[deviceID]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+		return deviceID;
 	}
 	else
 		return -1;
@@ -161,11 +161,11 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 
 void OpenNI2xWrapper::stopDevice(std::string uri)
 {
-	for(int i=0; i<m_DeviceInfoList.getSize(); i++)
+	for(auto it = m_Devices.begin(); it != m_Devices.end(); it++)
 	{
-		if(!strcmp(m_DeviceInfoList[i].getUri(), uri.c_str()))
+		if((*it).second->m_Uri == uri)
 		{	
-			stopDevice(i);
+			stopDevice((*it).first);
 			return;
 		}
 	}
@@ -173,7 +173,7 @@ void OpenNI2xWrapper::stopDevice(std::string uri)
 
 void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 		return;
 	
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
@@ -216,7 +216,7 @@ void OpenNI2xWrapper::stopDevice(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 		return;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iDeviceNumber]->m_Device.isFile())
@@ -241,7 +241,9 @@ void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::resumeDevice(uint16_t iDeviceNumber)
 {
-	
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
+		return;
+	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
 	{
 		m_Devices[iDeviceNumber]->m_DepthStream.start();
@@ -260,8 +262,9 @@ void OpenNI2xWrapper::resumeDevice(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::pausePlayback(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return;
+
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -273,7 +276,7 @@ void OpenNI2xWrapper::pausePlayback(uint16_t iRecordId)
 
 void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 
@@ -291,7 +294,7 @@ bool OpenNI2xWrapper::isPlaybackRunning(uint16_t iRecordId)
 
 bool OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return false;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(speed==0.0)
@@ -305,7 +308,7 @@ bool OpenNI2xWrapper::setPlaybackSpeed(uint16_t iRecordId, float speed)
 
 bool OpenNI2xWrapper::setPlaybackRgbFrameNumber(uint16_t iRecordId, unsigned long frame)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return false;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -318,7 +321,7 @@ bool OpenNI2xWrapper::setPlaybackRgbFrameNumber(uint16_t iRecordId, unsigned lon
 	
 bool OpenNI2xWrapper::setPlaybackIrFrameNumber(uint16_t iRecordId, unsigned long frame)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return false;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -331,7 +334,7 @@ bool OpenNI2xWrapper::setPlaybackIrFrameNumber(uint16_t iRecordId, unsigned long
 
 bool OpenNI2xWrapper::setPlaybackDepthFrameNumber(uint16_t iRecordId, unsigned long frame)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return false;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -346,7 +349,7 @@ bool OpenNI2xWrapper::setPlaybackDepthFrameNumber(uint16_t iRecordId, unsigned l
 
 unsigned long OpenNI2xWrapper::getPlaybackNumberOfRgbFrames(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return 0;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -358,7 +361,7 @@ unsigned long OpenNI2xWrapper::getPlaybackNumberOfRgbFrames(uint16_t iRecordId)
 
 unsigned long OpenNI2xWrapper::getPlaybackNumberOfIrFrames(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return 0;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -370,7 +373,7 @@ unsigned long OpenNI2xWrapper::getPlaybackNumberOfIrFrames(uint16_t iRecordId)
 
 unsigned long OpenNI2xWrapper::getPlaybackNumberOfDepthFrames(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return 0;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
 	if(m_Devices[iRecordId]->m_Device.isFile())
@@ -387,7 +390,6 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	int streamCount=0;
 	std::shared_ptr<OpenNIDevice> device = m_Devices[iDeviceNumber];
 	device->m_pStreams = new openni::VideoStream*[2];
-
 
 	if(m_bUserTrackingInitizialized && bHasUserTracker)	// whyever this has to be initialized first otherwise it crashes
 	{
@@ -471,12 +473,11 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 
 int16_t OpenNI2xWrapper::getRegisteredDeviceNumberForURI(std::string uri)
 {
-	for(uint16_t i=0; i<m_Devices.size(); i++)
+	for(auto it = m_Devices.begin(); it!=m_Devices.end(); it++)
 	{
-		if(m_Devices[i]->m_Uri == uri)
-			return i;
+		if((*it).second->m_Uri == uri)
+			return (*it).first;
 	}
-	
 	//std::cout << "No device registered in system with the specified URI" << std::endl;
 	return -1;	// no device with this uri found connected
 }
@@ -497,7 +498,7 @@ bool OpenNI2xWrapper::isDeviceActive(uint16_t iDeviceNumber)
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
 		return false;
@@ -509,13 +510,12 @@ bool OpenNI2xWrapper::isDeviceRunning(uint16_t iDeviceNumber)
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
 		return false;
 	}
 
-	
 	if(m_Devices[iDeviceNumber]->m_bIsDeviceActive && m_Devices[iDeviceNumber]->m_iDeviceState != openni::DeviceState::DEVICE_STATE_NOT_READY)
 		return true;
 	else
@@ -529,8 +529,8 @@ bool OpenNI2xWrapper::shutdown()
 	
 	std::cout << "OpenNI: Shutdown" << std::endl;
 
-	for(uint16_t i=0; i<m_Devices.size(); i++)
-		stopDevice(i);
+	for(auto it=m_Devices.begin(); it != m_Devices.end(); it++)
+		stopDevice((*it).first);
 	m_Devices.clear();
 
 	nite::NiTE::shutdown();
@@ -541,8 +541,7 @@ bool OpenNI2xWrapper::shutdown()
 
 bool OpenNI2xWrapper::resetDevice(uint16_t iDeviceNumber)
 {
-
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << "not initialized or running" << endl;
 		return false;
@@ -563,7 +562,7 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber, bool bMakeTextures)
 	
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber>=m_Devices.size() || !m_Devices[iDeviceNumber]->m_bIsDeviceActive)
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end() || !m_Devices[iDeviceNumber]->m_bIsDeviceActive)
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -700,7 +699,7 @@ void OpenNI2xWrapper::convertToCinder(shared_ptr<OpenNIDevice> device)
 #define USER_MESSAGE(msg) {	sprintf_s(m_Devices[iDeviceNumber]->m_cUserStatusLabels[user.getId()],"%s", msg);	printf("OpenNI:[%08llu] User #%d:\t%s\n",ts, user.getId(),msg);}
 void OpenNI2xWrapper::printUserState(uint16_t iDeviceNumber, const nite::UserData& user, uint64_t ts)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 		return;
 
 	if (user.isNew())
@@ -745,7 +744,7 @@ bool OpenNI2xWrapper::startRecording(uint16_t iDeviceNumber, std::string fileNam
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber < m_Devices.size() && m_Recorder.create(fileName.c_str()) == openni::STATUS_OK)
+	if(m_Devices.find(iDeviceNumber)!=m_Devices.end() && m_Recorder.create(fileName.c_str()) == openni::STATUS_OK)
 	{
 		if(m_Devices[iDeviceNumber]->m_bRGBStreamActive)
 			if(m_Recorder.attach(m_Devices[iDeviceNumber]->m_RGBStream, isLossyCompressed) != openni::STATUS_OK)
@@ -798,7 +797,7 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName, bool bLoop)		// ret
 	recorderDevice->m_bUserStreamActive = recorderDevice->m_bDepthStreamActive && m_bUserTrackingInitizialized;
 	recorderDevice->m_bIRStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_IR);
 	recorderDevice->m_Uri = fileName;
-	m_Devices.push_back(recorderDevice);	// push in list of all running devices
+	m_Devices[m_Devices.size()] = recorderDevice;	// push in list of all running devices
 	
 	std::cout << "OpenNI: Start playback " << fileName << std::endl;
 	startStreams(m_Devices.size()-1, recorderDevice->m_bRGBStreamActive, recorderDevice->m_bDepthStreamActive, recorderDevice->m_bUserStreamActive, recorderDevice->m_bIRStreamActive);
@@ -808,18 +807,18 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName, bool bLoop)		// ret
 
 void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
 {
-	if(iRecordId>=m_Devices.size())
+	if(m_Devices.find(iRecordId)==m_Devices.end())
 		return;
 
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
 	stopDevice(iRecordId);
-	m_Devices.erase(m_Devices.begin()+iRecordId);
+	m_Devices.erase(iRecordId);
 }
 
 uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end()) 
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -831,7 +830,7 @@ uint16_t OpenNI2xWrapper::getUserCount(uint16_t iDeviceNumber)
 
 void OpenNI2xWrapper::setDepthColorImageAlignment(uint16_t iDeviceNumber,  bool bEnabled)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -846,12 +845,14 @@ void OpenNI2xWrapper::setDepthColorImageAlignment(uint16_t iDeviceNumber,  bool 
 void OpenNI2xWrapper::setDepthColorSync(uint16_t iDeviceNumber, bool bEnabled)
 {
 	// freezes app this is a bug in openni
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
+		return;
 	m_Devices[iDeviceNumber]->m_Device.setDepthColorSyncEnabled(bEnabled);
 }
 
 void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnabled)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -867,7 +868,7 @@ void OpenNI2xWrapper::setAllStreamsMirrored(uint16_t iDeviceNumber, bool bEnable
 
 void OpenNI2xWrapper::setBackgroundSubtraction(uint16_t iDeviceNumber, bool bEnabled)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -877,7 +878,7 @@ void OpenNI2xWrapper::setBackgroundSubtraction(uint16_t iDeviceNumber, bool bEna
 
 uint16_t OpenNI2xWrapper::getRgbWidth(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -887,7 +888,7 @@ uint16_t OpenNI2xWrapper::getRgbWidth(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getRgbHeight(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -897,7 +898,7 @@ uint16_t OpenNI2xWrapper::getRgbHeight(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getIrWidth(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -907,7 +908,7 @@ uint16_t OpenNI2xWrapper::getIrWidth(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getIrHeight(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -917,7 +918,7 @@ uint16_t OpenNI2xWrapper::getIrHeight(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getDepthWidth(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -927,7 +928,7 @@ uint16_t OpenNI2xWrapper::getDepthWidth(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getDepthHeight(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -937,7 +938,7 @@ uint16_t OpenNI2xWrapper::getDepthHeight(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getUserWidth(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -947,7 +948,7 @@ uint16_t OpenNI2xWrapper::getUserWidth(uint16_t iDeviceNumber)
 
 uint16_t OpenNI2xWrapper::getUserHeight(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return 0;
@@ -957,7 +958,7 @@ uint16_t OpenNI2xWrapper::getUserHeight(uint16_t iDeviceNumber)
 
 bool OpenNI2xWrapper::setRgbResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return false;
@@ -982,7 +983,7 @@ bool OpenNI2xWrapper::setRgbResolution(uint16_t iDeviceNumber, uint16_t w, uint1
 
 bool OpenNI2xWrapper::setIrResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return false;
@@ -1007,7 +1008,7 @@ bool OpenNI2xWrapper::setIrResolution(uint16_t iDeviceNumber, uint16_t w, uint16
 
 bool OpenNI2xWrapper::setDepthResolution(uint16_t iDeviceNumber, uint16_t w, uint16_t h)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return false;
@@ -1032,7 +1033,7 @@ bool OpenNI2xWrapper::setDepthResolution(uint16_t iDeviceNumber, uint16_t w, uin
 
 Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Surface16u();
@@ -1046,7 +1047,7 @@ Surface16u OpenNI2xWrapper::getDepth16BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
@@ -1056,7 +1057,7 @@ gl::Texture OpenNI2xWrapper::getDepth16BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Surface();
@@ -1070,7 +1071,7 @@ Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 {	
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
@@ -1080,7 +1081,7 @@ gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Surface();
@@ -1094,7 +1095,7 @@ Surface OpenNI2xWrapper::getRGBSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
@@ -1104,7 +1105,7 @@ gl::Texture OpenNI2xWrapper::getRGBTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Surface();
@@ -1118,7 +1119,7 @@ Surface OpenNI2xWrapper::getIRSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
@@ -1128,7 +1129,7 @@ gl::Texture OpenNI2xWrapper::getIRTexture(uint16_t iDeviceNumber)
 
 Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Surface();
@@ -1142,7 +1143,7 @@ Surface OpenNI2xWrapper::getUserSurface(uint16_t iDeviceNumber)
 
 gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
@@ -1152,7 +1153,7 @@ gl::Texture OpenNI2xWrapper::getUserTexture(uint16_t iDeviceNumber)
 
 uint16_t* OpenNI2xWrapper::getDepth16BitImgPtr(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return nullptr;
@@ -1162,7 +1163,7 @@ uint16_t* OpenNI2xWrapper::getDepth16BitImgPtr(uint16_t iDeviceNumber)
 
 uint8_t* OpenNI2xWrapper::getDepth8BitImgPtr(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return nullptr;
@@ -1172,7 +1173,7 @@ uint8_t* OpenNI2xWrapper::getDepth8BitImgPtr(uint16_t iDeviceNumber)
 
 uint8_t* OpenNI2xWrapper::getRgbImgPtr(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return nullptr;
@@ -1182,7 +1183,7 @@ uint8_t* OpenNI2xWrapper::getRgbImgPtr(uint16_t iDeviceNumber)
 
 uint8_t* OpenNI2xWrapper::getIrImgPtr(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return nullptr;
@@ -1192,7 +1193,7 @@ uint8_t* OpenNI2xWrapper::getIrImgPtr(uint16_t iDeviceNumber)
 
 uint16_t* OpenNI2xWrapper::getUserImgPtr(uint16_t iDeviceNumber)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return nullptr;
@@ -1211,7 +1212,7 @@ bool OpenNI2xWrapper::isOneUserVisible(uint16_t iDeviceNumber)
 
 bool OpenNI2xWrapper::isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return false;
@@ -1229,7 +1230,7 @@ bool OpenNI2xWrapper::isUserVisible(uint16_t iDeviceNumber, uint16_t iUserID)
 
 Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUserID)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Vec3f();
@@ -1253,7 +1254,7 @@ Vec3f OpenNI2xWrapper::getUserCenterOfMass(uint16_t iDeviceNumber, uint16_t iUse
 
 std::vector<OpenNIJoint> OpenNI2xWrapper::getUserSkeletonJoints(uint16_t iDeviceNumber, uint16_t iUserID)			
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return std::vector<OpenNIJoint>();
@@ -1286,7 +1287,7 @@ std::vector<OpenNIJoint> OpenNI2xWrapper::getUserSkeletonJoints(uint16_t iDevice
 
 ci::Rectf OpenNI2xWrapper::getUserBoundingBox(uint16_t iDeviceNumber, uint16_t iUserID)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return Rectf();
@@ -1304,7 +1305,7 @@ ci::Rectf OpenNI2xWrapper::getUserBoundingBox(uint16_t iDeviceNumber, uint16_t i
 
 void OpenNI2xWrapper::drawSkeletons(uint16_t iDeviceNumber, ci::Rectf rect)
 {
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
@@ -1348,7 +1349,7 @@ void OpenNI2xWrapper::debugDraw(uint16_t iDeviceNumber)
 {
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	
 
-	if(iDeviceNumber>=m_Devices.size())
+	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;

@@ -63,6 +63,7 @@ class OpenNIDevice
 			m_UserTexture = ci::gl::Texture();
 			m_DepthDiffTexture = ci::gl::Texture();
 			m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+			m_Uri = "";
 		};
 
 		openni::Device								m_Device;
@@ -151,7 +152,7 @@ public:
 	void			stopDevice(uint16_t iDeviceNumber);
 	void			pauseDevice(uint16_t iDeviceNumber);
 	void			resumeDevice(uint16_t iDeviceNumber);
-	void			updateDevice(uint16_t iDeviceNumber, bool makeTextures=true);
+	void			updateDevice(uint16_t iDeviceNumber, bool bMakeTextures=true);
 	bool			resetDevice(uint16_t iDeviceNumber);
 	uint16_t		getDevicesConnected();
 	int16_t			getRegisteredDeviceNumberForURI(std::string uri);
@@ -231,7 +232,8 @@ private:
 	void onDeviceConnected(const openni::DeviceInfo* pInfo);
 	void onDeviceDisconnected(const openni::DeviceInfo* pInfo);
 
-	std::vector<std::shared_ptr<OpenNIDevice>>			m_Devices;
+	std::map<uint16_t, std::shared_ptr<OpenNIDevice>>	m_Devices;
+	
 	openni::Array<openni::DeviceInfo>					m_DeviceInfoList;	
 	openni::Recorder									m_Recorder;
 	std::recursive_mutex								m_Mutex;	
