@@ -35,8 +35,8 @@
 
 
 #define MAX_USERS 10
-#define DEFAULT_WIDTH 640
-#define DEFAULT_HEIGHT 480
+#define DEFAULT_WIDTH 320  // switched back from 640 x 480
+#define DEFAULT_HEIGHT 240
 
 class OpenNIDevice
 {
