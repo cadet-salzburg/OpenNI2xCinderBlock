@@ -238,5 +238,6 @@ private:
 	openni::Recorder									m_Recorder;
 	std::recursive_mutex								m_Mutex;	
 	bool												m_bUserTrackingInitizialized;
+	uint16_t											m_iUId;			// this is just counted up
 };
 

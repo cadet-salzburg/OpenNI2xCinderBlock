@@ -60,6 +60,7 @@ bool OpenNI2xWrapper::init(bool bUseUserTracking)
 	openni::Status rc = openni::STATUS_OK;
 	nite::Status niterc = nite::STATUS_OK;
 
+	m_iUId = 0;
 	rc = openni::OpenNI::initialize();
 	std::cout << "OpenNI: Init OpenNI " << openni::OpenNI::getVersion().major <<  "." << openni::OpenNI::getVersion().minor << std::endl;
 	if(rc != openni::STATUS_OK)
@@ -108,7 +109,6 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 {
 	openni::Status rc = openni::STATUS_OK;
 	nite::Status niterc = nite::STATUS_OK;
-	int16_t deviceID=-1;
 
 	if(iDeviceNumber>=m_DeviceInfoList.getSize())
 	{
@@ -146,17 +146,20 @@ int16_t OpenNI2xWrapper::startDevice(uint16_t iDeviceNumber, bool bHasRGBStream,
 		device->m_bDepthStreamActive = bHasDepthStream;
 		device->m_bUserStreamActive = bHasUserTracker && m_bUserTrackingInitizialized;
 		device->m_bIRStreamActive = bHasIRStream;
-		deviceID = m_Devices.size();
-		m_Devices[deviceID] = device;	// push in list of all running devices
+		m_Devices[m_iUId] = device;	// push in list of all running devices
+		m_iUId++;
 	}
 
-	if(startStreams( deviceID, device->m_bRGBStreamActive, device->m_bDepthStreamActive, device->m_bUserStreamActive, device->m_bIRStreamActive))
+	if(startStreams( m_iUId-1, device->m_bRGBStreamActive, device->m_bDepthStreamActive, device->m_bUserStreamActive, device->m_bIRStreamActive))
 	{
-		m_Devices[deviceID]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
-		return deviceID;
+		m_Devices[m_iUId-1]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+		return m_iUId-1;
 	}
 	else
+	{
+		m_Devices.erase(m_iUId-1);
 		return -1;
+	}
 }
 
 void OpenNI2xWrapper::stopDevice(std::string uri)
@@ -219,10 +222,7 @@ void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 	if(m_Devices.find(iDeviceNumber)==m_Devices.end())
 		return;
 	std::lock_guard<std::recursive_mutex> lock(m_Mutex);	// lock for correct asynchronous calls of update and stop
-	if(m_Devices[iDeviceNumber]->m_Device.isFile())
-	{
-		m_Devices[iDeviceNumber]->m_Player->setSpeed(-1);	
-	}
+	
 	if (m_Devices[iDeviceNumber]->m_DepthStream.isValid()) 
 	{
 		m_Devices[iDeviceNumber]->m_DepthStream.stop();
@@ -235,7 +235,7 @@ void OpenNI2xWrapper::pauseDevice(uint16_t iDeviceNumber)
 	{
 		m_Devices[iDeviceNumber]->m_IRStream.stop();
 	}
-
+	
 	m_Devices[iDeviceNumber]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
 }
 
@@ -271,7 +271,8 @@ void OpenNI2xWrapper::pausePlayback(uint16_t iRecordId)
 	{
 		m_Devices[iRecordId]->m_Player->setSpeed(-1);
 	}
-	pauseDevice(iRecordId);
+	m_Devices[iRecordId]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_NOT_READY;
+	//pauseDevice(iRecordId);
 }
 
 void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
@@ -284,7 +285,9 @@ void OpenNI2xWrapper::resumePlayback(uint16_t iRecordId)
 	{
 		m_Devices[iRecordId]->m_Player->setSpeed(1);
 	}
-	resumeDevice(iRecordId);
+	m_Devices[iRecordId]->m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+	
+	//resumeDevice(iRecordId);
 }
 
 bool OpenNI2xWrapper::isPlaybackRunning(uint16_t iRecordId)
@@ -797,12 +800,12 @@ int16_t OpenNI2xWrapper::startPlayback(std::string fileName, bool bLoop)		// ret
 	recorderDevice->m_bUserStreamActive = recorderDevice->m_bDepthStreamActive && m_bUserTrackingInitizialized;
 	recorderDevice->m_bIRStreamActive = recorderDevice->m_Device.hasSensor(openni::SENSOR_IR);
 	recorderDevice->m_Uri = fileName;
-	m_Devices[m_Devices.size()] = recorderDevice;	// push in list of all running devices
-	
+	m_Devices[m_iUId] = recorderDevice;	// push in list of all running devices
+	m_iUId++;
 	std::cout << "OpenNI: Start playback " << fileName << std::endl;
-	startStreams(m_Devices.size()-1, recorderDevice->m_bRGBStreamActive, recorderDevice->m_bDepthStreamActive, recorderDevice->m_bUserStreamActive, recorderDevice->m_bIRStreamActive);
+	startStreams(m_iUId-1, recorderDevice->m_bRGBStreamActive, recorderDevice->m_bDepthStreamActive, recorderDevice->m_bUserStreamActive, recorderDevice->m_bIRStreamActive);
 	
-	return m_Devices.size()-1;
+	return m_iUId-1;
 }
 
 void OpenNI2xWrapper::stopPlayback(uint16_t iRecordId)
