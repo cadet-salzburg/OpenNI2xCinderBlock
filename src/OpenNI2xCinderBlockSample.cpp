@@ -90,7 +90,7 @@ void OpenNI2xCinderBlockSample::draw()
 	{
 		if(m_OpenNI2xBlock.isDeviceActive(i))
 		{
-			m_OpenNI2xBlock.updateDevice(i);
+			m_OpenNI2xBlock.updateDevice(i,false);
 			m_OpenNI2xBlock.debugDraw(i);
 		}
 	}

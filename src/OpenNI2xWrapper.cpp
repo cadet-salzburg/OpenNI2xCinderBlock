@@ -394,6 +394,24 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 	std::shared_ptr<OpenNIDevice> device = m_Devices[iDeviceNumber];
 	device->m_pStreams = new openni::VideoStream*[2];
 
+	if(bHasDepthStream)
+	{
+		if(device->m_DepthStream.create(device->m_Device, openni::SENSOR_DEPTH) == openni::STATUS_OK )
+		{
+			setDepthResolution(iDeviceNumber,  DEFAULT_WIDTH, DEFAULT_HEIGHT); 
+			device->m_DepthStream.start();
+			openni::VideoMode depthVideoMode = device->m_DepthStream.getVideoMode();
+			device->m_iDepthImgWidth = depthVideoMode.getResolutionX();
+			device->m_iDepthImgHeight = depthVideoMode.getResolutionY();
+			device->m_pStreams[streamCount++] = &device->m_DepthStream;
+		}
+		else
+		{
+			device->m_bDepthStreamActive=false;
+			std::cout << "OpenNI: Couldn't start depth stream: " << openni::OpenNI::getExtendedError() << std::endl;
+		}
+	}	
+
 	if(m_bUserTrackingInitizialized && bHasUserTracker)	// whyever this has to be initialized first otherwise it crashes
 	{
 		if( device->m_pUserTracker==nullptr)
@@ -411,23 +429,7 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			}
 		}
 	}
-	if(bHasDepthStream)
-	{
-		if(device->m_DepthStream.create(device->m_Device, openni::SENSOR_DEPTH) == openni::STATUS_OK )
-		{
-			setDepthResolution(iDeviceNumber,  DEFAULT_WIDTH, DEFAULT_HEIGHT); 
-			device->m_DepthStream.start();
-			openni::VideoMode depthVideoMode = device->m_DepthStream.getVideoMode();
-			device->m_iDepthImgWidth = depthVideoMode.getResolutionX();
-			device->m_iDepthImgHeight = depthVideoMode.getResolutionY();
-			device->m_pStreams[streamCount++] = &device->m_DepthStream;
-		}
-		else
-		{
-			device->m_bDepthStreamActive=false;
-			std::cout << "OpenNI: Couldn't start depth stream: " << openni::OpenNI::getExtendedError() << std::endl;
-		}
-	}		
+	
 	if(bHasRGBStream)
 	{
 		if(device->m_RGBStream.create(device->m_Device, openni::SENSOR_COLOR) == openni::STATUS_OK)
@@ -627,16 +629,6 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber, bool bMakeTextures)
 		}
 		else
 			m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();	// just get the data and not read the frame anew as this has been done already in the user read frame above
-	
-		// normalizing values for 8bit depth display, this is done every frame, so not very performant
-		uint32_t size=m_Devices[iDeviceNumber]->m_iDepthImgWidth * m_Devices[iDeviceNumber]->m_iDepthImgHeight;
-		if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr == nullptr)
-			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr =  new unsigned char[size];
-		int normalizing = 10000; // 10meters max 
-		for( unsigned int i=0; i<size; ++i )
-		{
-			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr[i] = (unsigned char) ( m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr[i] * ( (float)( 255 ) / normalizing ) ); 	
-		}
 	}
 	// ir stream
 	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid())
@@ -681,10 +673,7 @@ void OpenNI2xWrapper::convertToCinder(shared_ptr<OpenNIDevice> device)
 	if(device->m_bDepthStreamActive && device->m_DepthStream.isValid() && device->m_pDepth16BitRawPtr!=nullptr)
 	{
 		device->m_Depth16BitSurface = Surface16u(Channel16u( device->m_iDepthImgWidth, device->m_iDepthImgHeight, device->m_DepthFrame.getStrideInBytes(), 1, device->m_pDepth16BitRawPtr));
-		device->m_Depth8BitSurface = Surface(Channel(device->m_iDepthImgWidth, device->m_iDepthImgHeight, device->m_iDepthImgWidth
-			, sizeof(char), device->m_pDepth8BitRawPtr)).clone();
 		device->m_Depth16BitTexture = gl::Texture(device->m_Depth16BitSurface);
-		device->m_Depth8BitTexture = gl::Texture(device->m_Depth8BitSurface);
 	}
 	
 	if(device->m_bDepthStreamActive && device->m_DepthStream.isValid() && device->m_pUserRawPtr!=nullptr)
@@ -1066,6 +1055,23 @@ Surface OpenNI2xWrapper::getDepth8BitSurface(uint16_t iDeviceNumber)
 		return Surface();
 	}
 
+	if(m_Devices[iDeviceNumber]->m_bDepthStreamActive && m_Devices[iDeviceNumber]->m_DepthStream.isValid() && m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr!=nullptr)
+	{
+		// normalizing values for 8bit depth display, this is done every frame, so not very performant
+		uint32_t size=m_Devices[iDeviceNumber]->m_iDepthImgWidth * m_Devices[iDeviceNumber]->m_iDepthImgHeight;
+		if(m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr == nullptr)
+			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr =  new unsigned char[size];
+		int normalizing = 10000; // 10meters max 
+		for( unsigned int i=0; i<size; ++i )
+		{
+			m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr[i] = (unsigned char) ( m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr[i] * ( (float)( 255 ) / normalizing ) ); 	
+		}
+
+		m_Devices[iDeviceNumber]->m_Depth8BitSurface = Surface(Channel(m_Devices[iDeviceNumber]->m_iDepthImgWidth, m_Devices[iDeviceNumber]->m_iDepthImgHeight, m_Devices[iDeviceNumber]->m_iDepthImgWidth
+			, sizeof(char), m_Devices[iDeviceNumber]->m_pDepth8BitRawPtr)).clone();
+	   m_Devices[iDeviceNumber]->m_Depth8BitTexture = gl::Texture(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
+	}
+
 	if(m_Devices[iDeviceNumber]->m_Depth8BitSurface)
 		return Surface(m_Devices[iDeviceNumber]->m_Depth8BitSurface);
 	else
@@ -1079,6 +1085,7 @@ gl::Texture OpenNI2xWrapper::getDepth8BitTexture(uint16_t iDeviceNumber)
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return cinder::gl::Texture();
 	}
+	m_Devices[iDeviceNumber]->m_Depth8BitTexture = getDepth8BitSurface(iDeviceNumber);
 	return m_Devices[iDeviceNumber]->m_Depth8BitTexture;
 }
 
