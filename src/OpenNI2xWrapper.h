@@ -35,97 +35,112 @@
 
 
 #define MAX_USERS 10
-#define DEFAULT_WIDTH 640
-#define DEFAULT_HEIGHT 480
+#define DEFAULT_WIDTH	640
+#define DEFAULT_HEIGHT	480
+
+class FrameListener : public openni::VideoStream::NewFrameListener
+{
+	void onNewFrame(openni::VideoStream& stream)
+	{
+		stream.readFrame(&m_frame);
+	}
+private:
+	openni::VideoFrameRef m_frame;
+
+};
 
 class OpenNIDevice
 {
-	public:	
-		OpenNIDevice()
-		{
-			// default initialization
-			m_pDepth16BitRawPtr = nullptr;
-			m_pDepth8BitRawPtr = nullptr;
-			m_pRgbRawPtr = nullptr;
-			m_pIrRawPtr = nullptr;
-			m_pUserRawPtr = nullptr;
-			m_pUserTracker = nullptr;
-			m_bRGBStreamActive = false;
-			m_bIRStreamActive = false;
-			m_bDepthStreamActive = false;
-			m_bUserStreamActive = false;
-			m_bSubtractBackground = false;
-			m_IRTexture = ci::gl::Texture();
-			m_RGBTexture = ci::gl::Texture();
-			m_Depth16BitTexture = ci::gl::Texture();
-			m_Depth8BitTexture = ci::gl::Texture();
-			m_DepthDiffHistogramTexture = ci::gl::Texture();
-			m_UserTexture = ci::gl::Texture();
-			m_DepthDiffTexture = ci::gl::Texture();
-			m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
-			m_Uri = "";
-		};
+public:	
+	OpenNIDevice()
+	{
+		// default initialization
+		m_pDepth16BitRawPtr = nullptr;
+		m_pDepth8BitRawPtr = nullptr;
+		m_pRgbRawPtr = nullptr;
+		m_pIrRawPtr = nullptr;
+		m_pUserRawPtr = nullptr;
+		m_pUserTracker = nullptr;
+		m_bRGBStreamActive = false;
+		m_bIRStreamActive = false;
+		m_bDepthStreamActive = false;
+		m_bUserStreamActive = false;
+		m_bSubtractBackground = false;
+		m_IRTexture = ci::gl::Texture();
+		m_RGBTexture = ci::gl::Texture();
+		m_Depth16BitTexture = ci::gl::Texture();
+		m_Depth8BitTexture = ci::gl::Texture();
+		m_DepthDiffHistogramTexture = ci::gl::Texture();
+		m_UserTexture = ci::gl::Texture();
+		m_DepthDiffTexture = ci::gl::Texture();
+		m_iDeviceState = openni::DeviceState::DEVICE_STATE_OK;
+		m_Uri = "";
+	};
 
-		openni::Device								m_Device;
-		openni::VideoStream**						m_pStreams;
-		openni::VideoStream							m_RGBStream;
-		openni::VideoStream							m_IRStream;
-		openni::VideoStream							m_DepthStream;
-		openni::VideoFrameRef						m_DepthFrame;
-		openni::VideoFrameRef						m_RGBFrame;
-		openni::VideoFrameRef						m_IRFrame;
-		nite::UserTrackerFrameRef					m_UserTrackerFrame;
-		nite::UserTracker*							m_pUserTracker;				// this has to be a pointer otherwise the shutdown won't work as you would expect
-		nite::UserId								m_poseUser;
-		uint64_t									m_poseTime;
-		uint16_t									m_UserCount;
-		openni::PlaybackControl*					m_Player;
-		openni::DeviceState							m_iDeviceState;
-		bool										m_bIsDeviceActive;
-		std::string									m_Uri;
+	openni::Device								m_Device;
+	FrameListener								m_FramelistenerRgb;
+	FrameListener								m_FramelistenerDepth;
+	FrameListener								m_FramelistenerIr;
+	openni::VideoStream**						m_pStreams;
+	openni::VideoStream							m_RGBStream;
+	openni::VideoStream							m_IRStream;
+	openni::VideoStream							m_DepthStream;
+	openni::VideoFrameRef						m_DepthFrame;
+	openni::VideoFrameRef						m_RGBFrame;
+	openni::VideoFrameRef						m_IRFrame;
+	nite::UserTrackerFrameRef					m_UserTrackerFrame;
+	nite::UserTracker*							m_pUserTracker;				// this has to be a pointer otherwise the shutdown won't work as you would expect
+	nite::UserId								m_poseUser;
+	uint64_t									m_poseTime;
+	uint16_t									m_UserCount;
+	openni::PlaybackControl*					m_Player;
+	openni::DeviceState							m_iDeviceState;
+	bool										m_bIsDeviceActive;
+	std::string									m_Uri;
 
-		bool					m_bVisibleUsers[MAX_USERS];
-		nite::SkeletonState		m_SkeletonStates[MAX_USERS];
-		char					m_cUserStatusLabels[MAX_USERS][100];
+	bool					m_bVisibleUsers[MAX_USERS];
+	nite::SkeletonState		m_SkeletonStates[MAX_USERS];
+	char					m_cUserStatusLabels[MAX_USERS][100];
 
-		uint16_t		m_iRgbImgWidth;
-		uint16_t		m_iRgbImgHeight;
-		uint16_t		m_iIRImgWidth;
-		uint16_t		m_iIRImgHeight;
-		uint16_t		m_iDepthImgWidth;
-		uint16_t		m_iDepthImgHeight;
-		uint16_t		m_iUserImgWidth;
-		uint16_t		m_iUserImgHeight;
+	uint16_t		m_iRgbImgWidth;
+	uint16_t		m_iRgbImgHeight;
+	uint16_t		m_iIRImgWidth;
+	uint16_t		m_iIRImgHeight;
+	uint16_t		m_iDepthImgWidth;
+	uint16_t		m_iDepthImgHeight;
+	uint16_t		m_iUserImgWidth;
+	uint16_t		m_iUserImgHeight;
 
-		bool	m_bRGBStreamActive;
-		bool	m_bIRStreamActive;
-		bool	m_bDepthStreamActive;
-		bool	m_bUserStreamActive;
-		bool	m_bSubtractBackground;
+	bool	m_bRGBStreamActive;
+	bool	m_bIRStreamActive;
+	bool	m_bDepthStreamActive;
+	bool	m_bUserStreamActive;
+	bool	m_bSubtractBackground;
 
-		uint16_t*		m_pDepth16BitRawPtr;
-		uint8_t*		m_pDepth8BitRawPtr;
-		uint8_t*		m_pRgbRawPtr;
-		uint8_t*		m_pIrRawPtr;
-		uint16_t*		m_pUserRawPtr;
+	uint16_t*		m_pDepth16BitRawPtr;
+	uint8_t*		m_pDepth8BitRawPtr;
+	uint8_t*		m_pRgbRawPtr;
+	uint8_t*		m_pIrRawPtr;
+	uint16_t*		m_pUserRawPtr;
 
-		ci::Surface								m_RGBSurface;
-		ci::Surface								m_IRSurface;
-		ci::Surface16u							m_Depth16BitSurface;
-		ci::Surface								m_Depth8BitSurface;
-		ci::Surface								m_UserSurface;
-		ci::Surface16u							m_BackgroundSurface;
-		ci::Surface16u							m_Depth16BitUserMask;
-		ci::Surface								m_Depth8BitUserMaskSurface;
+	ci::Surface								m_RGBSurface;
+	ci::Surface								m_IRSurface;
+	ci::Surface16u							m_Depth16BitSurface;
+	ci::Surface								m_Depth8BitSurface;
+	ci::Surface								m_UserSurface;
+	ci::Surface16u							m_BackgroundSurface;
+	ci::Surface16u							m_Depth16BitUserMask;
+	ci::Surface								m_Depth8BitUserMaskSurface;
 
-		ci::gl::Texture							m_IRTexture;
-		ci::gl::Texture							m_RGBTexture;
-		ci::gl::Texture							m_Depth16BitTexture;
-		ci::gl::Texture							m_Depth8BitTexture;
-		ci::gl::Texture							m_DepthDiffHistogramTexture;
-		ci::gl::Texture							m_UserTexture;
-		ci::gl::Texture							m_DepthDiffTexture;
+	ci::gl::Texture							m_IRTexture;
+	ci::gl::Texture							m_RGBTexture;
+	ci::gl::Texture							m_Depth16BitTexture;
+	ci::gl::Texture							m_Depth8BitTexture;
+	ci::gl::Texture							m_DepthDiffHistogramTexture;
+	ci::gl::Texture							m_UserTexture;
+	ci::gl::Texture							m_DepthDiffTexture;
 };
+
 
 class OpenNIJoint
 {
