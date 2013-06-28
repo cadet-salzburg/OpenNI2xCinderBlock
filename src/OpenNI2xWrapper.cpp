@@ -404,6 +404,8 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			device->m_iDepthImgWidth = depthVideoMode.getResolutionX();
 			device->m_iDepthImgHeight = depthVideoMode.getResolutionY();
 			device->m_pStreams[streamCount++] = &device->m_DepthStream;
+			device->m_FramelistenerDepth = shared_ptr<FrameListener>(new FrameListener(device,1));
+			device->m_DepthStream.addNewFrameListener(device->m_FramelistenerDepth.get());
 		}
 		else
 		{
@@ -427,6 +429,11 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 				device->m_pUserTracker=nullptr;
 				std::cout << "OpenNI: Couldn't create UserStream\n" << std::endl;
 			}
+			else
+			{
+				device->m_UserTrackerListener = std::shared_ptr<UserFrameListener>(new UserFrameListener(device));
+				device->m_pUserTracker->addNewFrameListener(device->m_UserTrackerListener.get());
+			}
 		}
 	}
 	
@@ -440,6 +447,8 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			device->m_iRgbImgWidth = colorVideoMode.getResolutionX();
 			device->m_iRgbImgHeight = colorVideoMode.getResolutionY();
 			device->m_pStreams[streamCount++] = &device->m_RGBStream;
+			device->m_FramelistenerRgb = shared_ptr<FrameListener>(new FrameListener(device,0));
+			device->m_RGBStream.addNewFrameListener(device->m_FramelistenerRgb.get());
 		}
 		else
 		{
@@ -457,6 +466,8 @@ bool OpenNI2xWrapper::startStreams(uint16_t iDeviceNumber, bool bHasRGBStream, b
 			device->m_iIRImgWidth = irVideoMode.getResolutionX();
 			device->m_iIRImgHeight = irVideoMode.getResolutionY();
 			device->m_pStreams[streamCount++] = &device->m_IRStream;
+			device->m_FramelistenerIr = shared_ptr<FrameListener>(new FrameListener(device,2));
+			device->m_IRStream.addNewFrameListener(device->m_FramelistenerIr.get());
 		}
 		else
 		{
@@ -571,70 +582,6 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber, bool bMakeTextures)
 	{
 		cout << "OpenNI: Device " << iDeviceNumber << " not initialized or running" << endl;
 		return;
-	}
-
-	// non-blocking wait --> return if not both streams are ready to process
-	if(openni::OpenNI::waitForAnyStream(m_Devices[iDeviceNumber]->m_pStreams, 1, &streamReady, 0) == openni::STATUS_TIME_OUT ||
-	openni::OpenNI::waitForAnyStream((m_Devices[iDeviceNumber]->m_pStreams+1), 1, &streamReady, 0) == openni::STATUS_TIME_OUT)
-	{
-		//cout << "OpenNI: Device " << iDeviceNumber << " timed out" << endl;
-		return; 
-	}
-	
-	// user tracking / skeleton tracking
-	if(m_Devices[iDeviceNumber]->m_bUserStreamActive && m_Devices[iDeviceNumber]->m_pUserTracker->isValid())
-	{
-		nite::Status niteRc = m_Devices[iDeviceNumber]->m_pUserTracker->readFrame(&m_Devices[iDeviceNumber]->m_UserTrackerFrame);
-		m_Devices[iDeviceNumber]->m_DepthFrame = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getDepthFrame();
-		
-		if(niteRc == nite::STATUS_OK)
-		{
-			const nite::UserMap& userLabels = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUserMap();
-			m_Devices[iDeviceNumber]->m_pUserRawPtr = (uint16_t*)userLabels.getPixels();
-			for(int y=0;y<m_Devices[iDeviceNumber]->m_iDepthImgHeight;y++)
-				for(int x=0;x<m_Devices[iDeviceNumber]->m_iDepthImgWidth;x++)
-					if(m_Devices[iDeviceNumber]->m_pUserRawPtr[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] >0)
-						m_Devices[iDeviceNumber]->m_pUserRawPtr[y*m_Devices[iDeviceNumber]->m_iDepthImgWidth + x] = UINT16_MAX;
-
-			
-			const nite::Array<nite::UserData>& users = m_Devices[iDeviceNumber]->m_UserTrackerFrame.getUsers();
-			m_Devices[iDeviceNumber]->m_UserCount = users.getSize();
-			for (int i = 0; i < m_Devices[iDeviceNumber]->m_UserCount; ++i)
-			{
-				const nite::UserData& user = users[i];
-
-				printUserState(iDeviceNumber, user, m_Devices[iDeviceNumber]->m_UserTrackerFrame.getTimestamp());
-				if (user.isNew())
-				{
-					m_Devices[iDeviceNumber]->m_pUserTracker->startSkeletonTracking(user.getId());
-				}
-			}
-		}
-	}
-	
-	// read streams image data
-	// rgb stream
-	if(m_Devices[iDeviceNumber]->m_bRGBStreamActive && m_Devices[iDeviceNumber]->m_RGBStream.isValid()) 
-	{
-		if(m_Devices[iDeviceNumber]->m_RGBStream.readFrame(&m_Devices[iDeviceNumber]->m_RGBFrame) ==openni::STATUS_OK)
-			m_Devices[iDeviceNumber]->m_pRgbRawPtr = (uint8_t*)m_Devices[iDeviceNumber]->m_RGBFrame.getData();
-	}
-	// depth stream		
-	if(m_Devices[iDeviceNumber]->m_bDepthStreamActive && m_Devices[iDeviceNumber]->m_DepthStream.isValid())
-	{
-		if(!m_Devices[iDeviceNumber]->m_bUserStreamActive)
-		{
-			if(m_Devices[iDeviceNumber]->m_DepthStream.readFrame(&m_Devices[iDeviceNumber]->m_DepthFrame)== openni::STATUS_OK)		// just get depth frame if not already polled before otherwise user and depth image aren't synced
-				m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();
-		}
-		else
-			m_Devices[iDeviceNumber]->m_pDepth16BitRawPtr = (uint16_t*) m_Devices[iDeviceNumber]->m_DepthFrame.getData();	// just get the data and not read the frame anew as this has been done already in the user read frame above
-	}
-	// ir stream
-	if(m_Devices[iDeviceNumber]->m_bIRStreamActive && m_Devices[iDeviceNumber]->m_IRStream.isValid())
-	{
-		if(m_Devices[iDeviceNumber]->m_IRStream.readFrame(&m_Devices[iDeviceNumber]->m_IRFrame) == openni::STATUS_OK)
-			m_Devices[iDeviceNumber]->m_pIrRawPtr = (uint8_t*)m_Devices[iDeviceNumber]->m_IRFrame.getData();
 	}
 
 	// subtract background if needed

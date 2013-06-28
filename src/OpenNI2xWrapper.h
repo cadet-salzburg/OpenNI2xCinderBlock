@@ -38,16 +38,9 @@
 #define DEFAULT_WIDTH	640
 #define DEFAULT_HEIGHT	480
 
-class FrameListener : public openni::VideoStream::NewFrameListener
-{
-	void onNewFrame(openni::VideoStream& stream)
-	{
-		stream.readFrame(&m_frame);
-	}
-private:
-	openni::VideoFrameRef m_frame;
 
-};
+class FrameListener;
+class UserFrameListener;
 
 class OpenNIDevice
 {
@@ -77,10 +70,12 @@ public:
 		m_Uri = "";
 	};
 
+	std::recursive_mutex						m_DeviceMutex;
 	openni::Device								m_Device;
-	FrameListener								m_FramelistenerRgb;
-	FrameListener								m_FramelistenerDepth;
-	FrameListener								m_FramelistenerIr;
+	std::shared_ptr<FrameListener>				m_FramelistenerRgb;
+	std::shared_ptr<FrameListener>				m_FramelistenerDepth;
+	std::shared_ptr<FrameListener>				m_FramelistenerIr;
+	std::shared_ptr<UserFrameListener>			m_UserTrackerListener;
 	openni::VideoStream**						m_pStreams;
 	openni::VideoStream							m_RGBStream;
 	openni::VideoStream							m_IRStream;
@@ -141,6 +136,81 @@ public:
 	ci::gl::Texture							m_DepthDiffTexture;
 };
 
+class UserFrameListener : public nite::UserTracker::NewFrameListener
+{
+public:
+	UserFrameListener(std::shared_ptr<OpenNIDevice> device) : mDevice(device)
+	{
+	}
+
+	void onNewFrame(nite::UserTracker& userTrackerRef)
+	{
+		// user tracking / skeleton tracking
+		if(mDevice->m_bUserStreamActive && mDevice->m_pUserTracker->isValid())
+		{
+			nite::Status niteRc = mDevice->m_pUserTracker->readFrame(&mDevice->m_UserTrackerFrame);
+			mDevice->m_DepthFrame = mDevice->m_UserTrackerFrame.getDepthFrame();
+
+			if(niteRc == nite::STATUS_OK)
+			{
+				const nite::UserMap& userLabels = mDevice->m_UserTrackerFrame.getUserMap();
+				mDevice->m_pUserRawPtr = (uint16_t*)userLabels.getPixels();
+				for(int y=0;y<mDevice->m_iDepthImgHeight;y++)
+					for(int x=0;x<mDevice->m_iDepthImgWidth;x++)
+						if(mDevice->m_pUserRawPtr[y*mDevice->m_iDepthImgWidth + x] >0)
+							mDevice->m_pUserRawPtr[y*mDevice->m_iDepthImgWidth + x] = UINT16_MAX;
+
+
+				const nite::Array<nite::UserData>& users = mDevice->m_UserTrackerFrame.getUsers();
+				mDevice->m_UserCount = users.getSize();
+				for (int i = 0; i < mDevice->m_UserCount; ++i)
+				{
+					const nite::UserData& user = users[i];
+
+					//deviceprintUserState(iDeviceNumber, user, mDevice->m_UserTrackerFrame.getTimestamp());
+					if (user.isNew())
+					{
+						mDevice->m_pUserTracker->startSkeletonTracking(user.getId());
+					}
+				}
+			}
+		}
+	}
+private:
+	std::shared_ptr<OpenNIDevice> mDevice;
+};
+
+class FrameListener : public openni::VideoStream::NewFrameListener
+{
+	public:
+	FrameListener(std::shared_ptr<OpenNIDevice> device, int type) : mDevice(device), mType(type)
+	{
+	}
+
+	void onNewFrame(openni::VideoStream& stream)
+	{
+	//	std::lock_guard<std::recursive_mutex> lock(mDevice->m_DeviceMutex);	
+		if(mType==0)
+		{
+			if(mDevice->m_bRGBStreamActive && mDevice->m_RGBStream.isValid()) 
+			{
+				stream.readFrame(&mDevice->m_RGBFrame);
+				mDevice->m_pRgbRawPtr = (uint8_t*)mDevice->m_RGBFrame.getData();
+			}
+		}
+		else if(mType==1)
+		{
+			if(mDevice->m_bDepthStreamActive && mDevice->m_DepthStream.isValid()) 
+			{
+				stream.readFrame(&mDevice->m_DepthFrame);
+				mDevice->m_pDepth16BitRawPtr = (uint16_t*) mDevice->m_DepthFrame.getData();
+			}
+		}
+	}
+private:
+	std::shared_ptr<OpenNIDevice> mDevice;
+	int mType;
+};
 
 class OpenNIJoint
 {
