@@ -658,10 +658,10 @@ void OpenNI2xWrapper::updateDevice(uint16_t iDeviceNumber, bool bMakeTextures)
 					}
 		}
 
-	/*
+	
 	if(bMakeTextures)
 		convertToCinder(m_Devices[iDeviceNumber]);
-	*/
+	
 }
 
 void OpenNI2xWrapper::convertToCinder(shared_ptr<OpenNIDevice> device)
